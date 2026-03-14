@@ -1,3 +1,3 @@
-# PLANNING PHASE .. - 3days before start
+# PLANNING PHASE .. - 20
 
 
