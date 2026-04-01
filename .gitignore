@@ -1,0 +1,29 @@
+# ── Dependencies ──
+node_modules/
+package-lock.json
+
+# ── Build Output ──
+dist/
+release/
+
+# ── Database (local) ──
+*.db
+*.db-wal
+*.db-shm
+
+# ── Electron ──
+*.log
+
+# ── OS Files ──
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ──
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── Temporary ──
+tmp/
