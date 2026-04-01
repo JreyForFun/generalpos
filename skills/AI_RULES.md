@@ -74,7 +74,8 @@ Examples:
 - **UI state** (modals open/close, input values) → `useState` in component
 
 ### Styling Rules
-- Use **TailwindCSS utility classes only** — no custom CSS files unless absolutely necessary
+- Use **TailwindCSS utility classes only** — reference DESIGN_SYSTEM.md for color tokens, spacing, and component patterns
+- Use CSS variables defined in `index.css` for theme tokens — all components consume variables, not hard-coded colors
 - Use `cn()` helper (clsx + twMerge) for conditional class names
 - Touch targets must be minimum **44x44px** for tablet compatibility
 - Never use inline `style={{}}` except for dynamic values that Tailwind cannot handle
@@ -90,8 +91,27 @@ Examples:
 
 ### Data Mutation Rules
 - Completed orders are **immutable** — never UPDATE an order after status = 'completed'
-- Refunds create a **new order** with negative amounts
+- Refunds create a **new order** with `refund_for` referencing the original order ID, and negative amounts
 - Stock deductions happen **inside the same transaction** as order creation
+- Stock is **restored** in the same transaction when a refund is processed
+
+### Currency Precision Rules
+- All monetary calculations use **integer centavos internally** (multiply by 100, divide on display)
+- OR use `toFixed(2)` on every arithmetic result — never trust raw float math
+- Currency rounding mode is stored in `app_settings` key `currency_rounding`: `'none'` | `'centavo_5'` | `'peso'`
+- Always round **after** all discounts and subtotals are computed — never round intermediates
+
+### Audit Logging Rules
+- Every destructive or sensitive action must write to `audit_log` via `electron/utils/audit.js`
+- Actions that require logging:
+  - Product create / update / delete
+  - Order refund
+  - Cashier create / deactivate / PIN change
+  - Customer delete
+  - Cash flow entries (open, in, out, close)
+  - Settings changes
+- Audit log is **append-only** — never UPDATE or DELETE from `audit_log`
+- Log entry format: `{ cashier_id, action, target_type, target_id, details (JSON) }`
 
 ### Naming Conventions
 - Table names: **snake_case plural** → `order_items`, `product_variants`
@@ -140,13 +160,29 @@ db.exec(`INSERT INTO orders VALUES ('${userInput}')`);
 
 ### Feedback Rules
 - Every action that modifies data must show a **success or error toast**
-- Destructive actions (delete product, void order) require a **confirmation modal**
+- Destructive actions (delete product, void order) require a **confirmation modal** (`ConfirmModal.jsx`)
 - Loading states only for operations that genuinely take > 300ms
+
+### Auto-Lock
+- App auto-locks after configurable idle timeout (default: 5 minutes, stored in `app_settings`)
+- Lock screen shows PIN pad — same `PinPad.jsx` component as login
+- Idle detection based on mouse movement, keyboard, and touch events (via `useIdleLock` hook)
+- Timer resets on any user interaction
+- Cashier session is **preserved** — no logout, just lock overlay
+- Implemented as `<IdleLock>` wrapper component around the main layout
+
+### Keyboard Shortcuts
+- `F2` — Focus search bar
+- `F9` — Open payment modal (when cart has items)
+- `F4` — Hold current order
+- `Escape` — Close active modal / clear search
+- Managed via `useKeyboardShortcuts` hook — never attach raw `keydown` listeners in components
 
 ### Receipt
 - Always preview receipt before printing
 - Include: store name, date/time, cashier name, itemized list, subtotal, discount, total, payment method, change
 - Optional footer: store message, social media, promo
+- Receipt template customization is field-based (Settings page) — not a WYSIWYG editor
 
 ---
 
@@ -166,6 +202,28 @@ ipcMain.handle('products:delete', (event, id) => {
   }
   // proceed with delete
 });
+```
+
+### Input Validation (Main Process)
+- All IPC handlers must validate input types via `electron/utils/validate.js` before processing
+- Validation rules:
+  - `quantity` → positive integer, max 9,999
+  - `price` / `amount` → non-negative number, ≤ 2 decimal places, max 999,999.99
+  - `name` / `text` → string, trimmed, max 255 characters
+  - `id` → positive integer
+  - `pin` → string, digits only, length 4-6
+- Reject invalid input immediately: `{ success: false, error: 'Invalid input' }`
+- Never trust renderer-side validation alone — always validate in Main process
+
+```js
+// electron/utils/validate.js pattern
+const validate = {
+  id: (v) => Number.isInteger(v) && v > 0,
+  quantity: (v) => Number.isInteger(v) && v > 0 && v <= 9999,
+  amount: (v) => typeof v === 'number' && v >= 0 && v <= 999999.99,
+  text: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 255,
+  pin: (v) => typeof v === 'string' && /^\d{4,6}$/.test(v),
+};
 ```
 
 ---
@@ -217,3 +275,52 @@ Do not add, suggest, or scaffold any of the following unless explicitly asked:
 - ❌ Online payment gateway (GCash, PayMongo, Stripe)
 - ❌ User-facing customer login portal
 - ❌ Multi-device sync / real-time collaboration
+- ❌ SQLite encryption (accepted risk for V1 — see ARCHITECTURE.md §6.5)
+- ❌ WYSIWYG receipt template editor (field-based only)
+
+---
+
+## 11. Testing Conventions
+
+### Framework
+- **Unit tests:** Vitest — for business logic, utilities, store logic
+- **E2E tests:** Playwright — for Electron app critical flows only
+- Test files live in `tests/unit/` and `tests/e2e/`
+
+### What Must Be Unit Tested
+- All currency/rounding calculations
+- Cart total computation (subtotal, discounts, tips, final total)
+- Bill split validation (split amounts must equal order total)
+- Stock deduction logic
+- Loyalty points calculation (earn and redeem)
+- Input validation functions (`validate.js`)
+- Order number generation
+
+### Unit Test Style
+```js
+// Use describe + it blocks, no test IDs or database needed
+import { describe, it, expect } from 'vitest';
+
+describe('cart totals', () => {
+  it('applies percentage discount correctly', () => {
+    const subtotal = 100;
+    const discount = applyDiscount(subtotal, { type: 'percent', value: 10 });
+    expect(discount).toBe(10);
+  });
+
+  it('handles floating point edge case', () => {
+    expect(addMoney(0.1, 0.2)).toBe(0.3); // not 0.30000000000000004
+  });
+});
+```
+
+### E2E Test Scope
+- **One critical path only:** Login → Browse → Add to cart → Pay → Receipt → Order history
+- Run after each phase completion
+- Do not E2E test admin/settings flows — manual QA for those
+
+### Running Tests
+```bash
+npm test          # Runs Vitest unit tests
+npm run test:e2e  # Runs Playwright E2E tests
+```

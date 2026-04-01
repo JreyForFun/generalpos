@@ -86,7 +86,7 @@ Authentication is PIN-based. No internet login required.
 |---|---|---|---|
 | CHK-01 | Prices & Discounts | Apply % or fixed discounts per item or whole order | High |
 | CHK-02 | Parallel Orders | Hold active order, start a new one simultaneously | High |
-| CHK-03 | Customized Receipts | Editable receipt template (store name, promos, hours) | Medium |
+| CHK-03 | Customized Receipts | Field-based receipt template (store name, promos, hours) — not WYSIWYG | Medium |
 | CHK-04 | Sell on the Move | Works on tablet with touch-friendly UI | Medium |
 
 ---
@@ -135,9 +135,14 @@ Authentication is PIN-based. No internet login required.
 | **Performance** | Checkout screen must load in under 1 second |
 | **Offline First** | 100% of core features work without internet |
 | **Data Safety** | Auto-backup SQLite database daily to a local folder |
-| **Security** | PIN-based auth, role-based access control |
+| **Security** | PIN-based auth (bcrypt hashed), role-based access control |
+| **Input Validation** | All IPC inputs validated in Main process before processing |
+| **Auto-Lock** | Screen locks after configurable idle timeout (default: 5min), PIN re-entry to unlock |
+| **Audit Logging** | All sensitive actions logged to append-only `audit_log` table |
+| **Dark Mode** | Obsidian Terminal dark theme as default — optimized for varied lighting |
 | **Installable** | Single installer (.exe / .dmg / .deb) for easy deployment |
 | **Printable** | Receipt and invoice printing via system printer |
+| **Testable** | Unit tests (Vitest) for business logic, E2E test (Playwright) for critical checkout flow |
 
 ---
 
