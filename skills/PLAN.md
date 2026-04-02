@@ -25,17 +25,42 @@ Get the development environment running with Electron + React + SQLite working e
 - [ ] Configure Electron with `electron-builder`
 - [ ] Set up `contextBridge` + `ipcMain` / `ipcRenderer` bridge
 - [ ] Install and configure `better-sqlite3`
-- [ ] Create initial SQLite migration (all tables from schema)
-- [ ] Set up TailwindCSS
-- [ ] Set up Zustand for state management
+- [ ] Create initial SQLite migration (`001_initial.sql` — all tables from ARCHITECTURE.md)
+- [ ] Create indexes migration (`002_indexes.sql`)
+- [ ] Implement migration runner in `db.js`
+- [ ] Set up TailwindCSS with theme tokens from DESIGN_SYSTEM.md
+- [ ] Create `index.css` with CSS variables for Obsidian Terminal theme
+- [ ] Set up Zustand — create `viewStore`, `sessionStore`, `checkoutStore`, `settingsStore`
+- [ ] Create `src/constants/` — `ipc-channels.js`, `roles.js`, `order-status.js`
+- [ ] Create `src/lib/cn.js` — clsx + tailwind-merge helper
+- [ ] Create `electron/utils/validate.js` — input validation
+- [ ] Create `electron/utils/audit.js` — audit log writer
+- [ ] Create `electron/utils/session.js` — in-memory session manager
 - [ ] Set up `electron-log` for error logging
-- [ ] Create IPC channel constants file
 - [ ] Set up custom window (frameless + custom titlebar)
 - [ ] Configure `electron-builder.yml` for Windows/macOS/Linux output
 - [ ] Create basic folder structure as per ARCHITECTURE.md
+- [ ] Set up Vitest + create first smoke test
+- [ ] Install Playwright for future E2E tests
+
+### Acceptance Criteria
+- Electron app opens without crash on Windows
+- SQLite DB is created with all tables and indexes from ARCHITECTURE.md
+- Migration runner applies `001_initial.sql` and `002_indexes.sql` successfully
+- IPC round-trip works: renderer calls main, gets response
+- TailwindCSS compiles with theme tokens — verify with a test `<div>`
+- `npm test` runs Vitest and passes the smoke test
+
+### QA Checklist
+- [ ] App opens without crash on Windows
+- [ ] SQLite DB created with all tables (count: 13 tables + `_migrations`)
+- [ ] All indexes exist in DB
+- [ ] IPC round-trip works (call from renderer → response from main)
+- [ ] TailwindCSS theme tokens render correctly
+- [ ] `npm test` passes
 
 ### Deliverable
-A running Electron app that opens, shows a blank screen, and can read/write to SQLite.
+A running Electron app that opens, shows a blank screen with the correct theme, and can read/write to SQLite.
 
 ---
 
@@ -93,7 +118,30 @@ A working checkout flow from product selection to payment and receipt.
 #### Receipt
 - [ ] Receipt preview modal
 - [ ] Print via system printer
-- [ ] Customizable footer (store message)
+- [ ] Customizable footer (store message — field-based, not WYSIWYG)
+
+### Acceptance Criteria
+- Cashier can complete a full transaction (browse → cart → pay → receipt) in under 30 seconds
+- All currency math is correct — no floating-point drift
+- Receipt displays all required fields (store name, date, cashier, items, totals, change)
+- No state leaks between consecutive orders
+
+### QA Checklist
+- [ ] Cashier can log in with correct PIN
+- [ ] Wrong PIN shows shake animation, does NOT reveal PIN length
+- [ ] Product grid loads in < 1 second
+- [ ] Add 5 items, adjust quantities, remove 1 — totals are correct
+- [ ] Apply 10% discount — math is correct (e.g., ₱100 → ₱90)
+- [ ] Apply ₱50 fixed discount — math is correct
+- [ ] Pay with ₱500 cash on ₱347 order — change shows ₱153
+- [ ] Currency rounding works (₱45.43 → ₱45 with peso rounding)
+- [ ] Receipt preview shows all line items, totals, and change
+- [ ] Order appears in SQLite `orders` table after completion
+- [ ] `order_items` has snapshot of product name & price (not references)
+- [ ] Floating point edge case: `0.1 + 0.2` handled correctly
+- [ ] Process 10 consecutive orders — no state leakage between them
+- [ ] Auto-lock triggers after 5 minutes idle — PIN re-entry unlocks
+- [ ] Unit tests pass: `npm test` (cart totals, rounding, validation)
 
 ### Deliverable
 Fully working checkout — cashier can select products, apply discounts, take cash, and print receipt.
@@ -132,7 +180,29 @@ Admin can manage products, variants, barcodes, and monitor stock.
 - [ ] Stock level display per product
 - [ ] Manual stock adjustment (add/remove with reason)
 - [ ] Low stock alert badge on dashboard
-- [ ] Stock auto-deducted on order completion
+- [ ] Stock auto-deducted on order completion (in same transaction)
+
+### Acceptance Criteria
+- Admin can create a product with variants and see it in the checkout grid
+- Stock decreases correctly on order completion and restores on refund
+- Low stock alert appears when stock ≤ threshold
+- Gift card can be created, used at checkout, and balance decreases correctly
+- All product CRUD operations are logged in `audit_log`
+
+### QA Checklist
+- [ ] Admin can add product with name, price, category, image
+- [ ] Product appears in checkout grid after creation
+- [ ] Add 3 variants to a product — each has independent price and stock
+- [ ] Assign 2 barcodes to a product — both resolve to the same product
+- [ ] Toggle product availability — hidden from checkout grid when unavailable
+- [ ] Stock decreases by correct quantity on order completion
+- [ ] Low stock alert badge appears when stock ≤ threshold
+- [ ] Manual stock adjustment: add 10, verify new total
+- [ ] Gift card: create with ₱500 balance, use ₱200 at checkout, verify ₱300 remaining
+- [ ] Gift card with ₱0 balance cannot be used
+- [ ] Expired gift card cannot be used
+- [ ] Product image uploads and displays correctly
+- [ ] All create/update/delete actions appear in `audit_log`
 
 ### Deliverable
 Admin can add/manage products and variants, view stock, and gift cards work at checkout.
@@ -165,6 +235,25 @@ Cashiers can look up customers and apply loyalty benefits at checkout.
 - [ ] eWallet payment option — deduct from balance
 - [ ] Points calculation on order completion
 - [ ] Points display + redeem points at checkout
+
+### Acceptance Criteria
+- Customer discount auto-applies when customer is selected at checkout
+- eWallet balance decreases correctly on payment
+- Loyalty points are earned proportionally and can be redeemed
+- Customer purchase history is viewable from their profile
+
+### QA Checklist
+- [ ] Add customer with name, phone, email — appears in customer list
+- [ ] Search customer by name — found
+- [ ] Search customer by phone — found
+- [ ] Select customer at checkout — their discount auto-applies to total
+- [ ] Customer with 10% discount: ₱200 order → ₱180 total
+- [ ] Customer with expired discount — discount NOT applied
+- [ ] eWallet: customer has ₱500 balance, pay ₱300, verify ₱200 remaining
+- [ ] eWallet: customer has ₱100 balance, try to pay ₱300 — error shown
+- [ ] Loyalty: complete ₱500 order, verify points earned (500 × points_per_peso)
+- [ ] Loyalty: redeem 100 points at checkout, verify discount applied
+- [ ] Customer profile page shows purchase history
 
 ### Deliverable
 Cashier can identify a customer, apply their discount, use eWallet, and earn/redeem loyalty points.
@@ -220,6 +309,36 @@ Owner/manager can view sales data, manage cashiers, and reconcile cash.
 - [ ] Confirm all operations work without internet
 - [ ] Implement optional cloud backup trigger (SQLite file upload)
 
+### Acceptance Criteria
+- Held orders can be resumed with full cart state intact
+- Bill split validates that payer amounts equal order total
+- Cash flow reconciliation (open → close) produces correct summary
+- Daily sales report matches sum of all completed orders for the day
+- Report exports as readable PDF
+
+### QA Checklist
+- [ ] Hold order with 3 items → start new order → resume held order — all 3 items + quantities intact
+- [ ] Hold 3 orders simultaneously — all 3 visible in held orders panel
+- [ ] Resume held order — it is removed from held list
+- [ ] Bill split: 2 payers, amounts equal total — order completes
+- [ ] Bill split: amounts DON'T equal total — error shown, order blocked
+- [ ] Bill split: one payer uses cash, another uses eWallet — both recorded
+- [ ] Order history: filter by today's date — shows only today's orders
+- [ ] Order history: filter by cashier — shows only that cashier's orders
+- [ ] Order history: filter by customer — shows only that customer's orders
+- [ ] Order detail view shows all items, discount, payment method
+- [ ] Refund: select completed order → refund → new refund order created with `refund_for` reference
+- [ ] Refund: stock is restored for refunded items
+- [ ] Cash flow: open drawer with ₱1000 → process sales → cash out ₱200 → close drawer — summary correct
+- [ ] Daily sales report total matches sum of order totals
+- [ ] Sales by payment method pie chart renders correctly
+- [ ] Best-selling products list is accurate
+- [ ] Report exports as PDF — opens correctly
+- [ ] Admin can add/deactivate cashier
+- [ ] Admin can change cashier role
+- [ ] Admin can reset cashier PIN
+- [ ] All cashier management actions logged in `audit_log`
+
 ### Deliverable
 Full reporting, cashier management, cash reconciliation, and parallel orders working.
 
@@ -262,6 +381,32 @@ App is stable, tested, looks professional, and can be installed on a store's mac
 - [ ] Load realistic demo data (products, customers, orders)
 - [ ] Create a demo cashier account (PIN: 1234)
 - [ ] Write a 1-page Quick Start Guide for store owner
+
+### Acceptance Criteria
+- Windows installer produces a working `.exe` that installs and runs on a clean machine
+- Auto-backup creates a timestamped DB copy on app close
+- All flows feel polished — no raw errors, broken layouts, or missing feedback
+- New user can complete first transaction within 5 minutes of opening the app
+
+### QA Checklist
+- [ ] Every list page has an empty state (not blank screen)
+- [ ] Loading skeletons show for DB queries > 300ms
+- [ ] All success actions show toast notification
+- [ ] All error actions show toast notification with friendly message
+- [ ] Delete product → confirmation modal → confirm → product deleted + toast
+- [ ] Auto-lock triggers after configurable timeout
+- [ ] PIN re-entry on lock screen — session preserved (cart state intact)
+- [ ] Responsive layout: test on 1024px wide viewport (tablet)
+- [ ] Settings page: change store name → receipt shows new name
+- [ ] Settings page: change currency rounding → checkout uses new rounding
+- [ ] Settings page: change loyalty rates → points calculation uses new rates
+- [ ] All IPC handlers validate role before sensitive operations
+- [ ] No plain-text PINs in database (bcrypt hashes only)
+- [ ] No SQL injection possible (parameterized queries only)
+- [ ] Windows installer (.exe) installs and runs on clean machine
+- [ ] Auto-backup creates DB copy on app close → file exists in backup folder
+- [ ] E2E test passes: `npm run test:e2e`
+- [ ] All unit tests pass: `npm test`
 
 ### Deliverable
 Installable, demo-ready POS that can be shown to any store.
