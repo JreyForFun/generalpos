@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Banknote, ArrowRight } from 'lucide-react';
+import { Banknote, ArrowRight, CreditCard, Check } from 'lucide-react';
 import Modal from '../shared/Modal';
 import { useCheckoutStore } from '../../store/checkoutStore';
 import { useToast } from '../shared/Toast';
@@ -25,9 +25,15 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
   const [cashReceived, setCashReceived] = useState('');
   const [processing, setProcessing] = useState(false);
 
+  // Gift card state
+  const [giftCardCode, setGiftCardCode] = useState('');
+  const [giftCardAmount, setGiftCardAmount] = useState(0);
+  const [giftCardApplied, setGiftCardApplied] = useState(false);
+
   const cashAmount = parseFloat(cashReceived) || 0;
-  const change = cashAmount - total;
-  const canPay = cashAmount >= total && total > 0;
+  const remainingAfterGift = Math.max(0, total - giftCardAmount);
+  const change = cashAmount - remainingAfterGift;
+  const canPay = cashAmount >= remainingAfterGift && total > 0;
 
   const handleQuickAmount = (amount) => {
     setCashReceived(String(amount));
@@ -87,7 +93,26 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
   const handleClose = () => {
     setCashReceived('');
     setProcessing(false);
+    setGiftCardCode('');
+    setGiftCardAmount(0);
+    setGiftCardApplied(false);
     onClose();
+  };
+
+  const handleApplyGiftCard = async () => {
+    if (!giftCardCode.trim()) return;
+    // Try to apply the full remaining total from the gift card
+    const amountToApply = Number(total.toFixed(2));
+    const result = await window.electronAPI.redeemGiftCard(giftCardCode.trim(), amountToApply);
+    if (result.success) {
+      // Backend deducted min(balance, amountToApply). Applied = total - remainingBalance if remaining >= 0
+      const applied = Number((amountToApply - Math.max(0, result.data.remainingBalance)).toFixed(2)) || amountToApply;
+      setGiftCardAmount(amountToApply);
+      setGiftCardApplied(true);
+      toast.success(`Gift card applied! ₱${amountToApply.toFixed(2)} deducted`);
+    } else {
+      toast.error(result.error || 'Invalid gift card');
+    }
   };
 
   return (
@@ -99,6 +124,57 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
           <p className="font-heading text-display text-accent-primary tabular-nums">
             ₱{total.toFixed(2)}
           </p>
+        </div>
+
+        {/* Gift Card Section */}
+        <div className="rounded-lg border border-border p-3">
+          {!giftCardApplied ? (
+            <div className="flex items-center gap-2">
+              <CreditCard size={16} className="text-text-muted shrink-0" />
+              <input
+                type="text"
+                value={giftCardCode}
+                onChange={(e) => setGiftCardCode(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleApplyGiftCard()}
+                placeholder="Gift card code"
+                className="flex-1 h-9 px-2 rounded bg-bg-input border border-border text-small text-text-primary font-mono placeholder:text-text-muted focus:border-border-focus focus:outline-none"
+              />
+              <button
+                onClick={handleApplyGiftCard}
+                disabled={!giftCardCode.trim()}
+                className={cn(
+                  'px-3 h-9 rounded text-small font-medium transition-colors',
+                  giftCardCode.trim()
+                    ? 'bg-accent-secondary text-white hover:bg-accent-secondary-hover'
+                    : 'bg-bg-hover text-text-muted cursor-not-allowed'
+                )}
+              >
+                Apply
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Check size={16} className="text-accent-primary" />
+                <span className="text-small text-text-primary">
+                  Gift card <span className="font-mono text-accent-secondary">{giftCardCode}</span> applied
+                </span>
+              </div>
+              <span className="font-heading text-body text-accent-primary tabular-nums">
+                -₱{giftCardAmount.toFixed(2)}
+              </span>
+            </div>
+          )}
+          {giftCardApplied && remainingAfterGift > 0 && (
+            <p className="text-tiny text-text-muted mt-2">
+              Remaining to pay: ₱{remainingAfterGift.toFixed(2)}
+            </p>
+          )}
+          {giftCardApplied && remainingAfterGift <= 0 && (
+            <p className="text-tiny text-accent-primary mt-2">
+              Fully covered by gift card!
+            </p>
+          )}
         </div>
 
         {/* Cash Received Input */}

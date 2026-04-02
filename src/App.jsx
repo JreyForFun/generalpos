@@ -9,6 +9,7 @@ import Customers from './pages/Customers';
 import Reports from './pages/Reports';
 import Cashiers from './pages/Cashiers';
 import Inventory from './pages/Inventory';
+import GiftCards from './pages/GiftCards';
 import Settings from './pages/Settings';
 import IdleLock from './components/layout/IdleLock';
 
@@ -20,6 +21,7 @@ const views = {
   reports:   Reports,
   cashiers:  Cashiers,
   inventory: Inventory,
+  giftcards: GiftCards,
   settings:  Settings,
 };
 

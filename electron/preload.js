@@ -77,4 +77,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getGiftCards:   ()     => ipcRenderer.invoke('giftcards:getAll'),
   createGiftCard: (data) => ipcRenderer.invoke('giftcards:create', data),
   redeemGiftCard: (code, amount) => ipcRenderer.invoke('giftcards:redeem', code, amount),
+
+  // ─── Image Upload ───
+  uploadImage: () => ipcRenderer.invoke('dialog:uploadImage'),
 });

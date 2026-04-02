@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const log = require('electron-log');
 const { initDatabase } = require('../database/db');
@@ -85,6 +85,38 @@ app.whenReady().then(() => {
   });
   ipcMain.on('window:close', () => mainWindow?.close());
   ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized());
+
+  // Image upload handler — copies image to local storage
+  ipcMain.handle('dialog:uploadImage', async () => {
+    try {
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Select Product Image',
+        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }],
+        properties: ['openFile'],
+      });
+
+      if (result.canceled || !result.filePaths.length) {
+        return { success: false, error: 'No file selected' };
+      }
+
+      const fs = require('fs');
+      const sourcePath = result.filePaths[0];
+      const imagesDir = path.join(app.getPath('userData'), 'images');
+      if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
+
+      const ext = path.extname(sourcePath);
+      const filename = `product-${Date.now()}${ext}`;
+      const destPath = path.join(imagesDir, filename);
+
+      fs.copyFileSync(sourcePath, destPath);
+      log.info(`Image uploaded: ${destPath}`);
+
+      return { success: true, data: { path: destPath } };
+    } catch (err) {
+      log.error('dialog:uploadImage failed', err);
+      return { success: false, error: 'Failed to upload image' };
+    }
+  });
 
   // Create main window
   createWindow();
