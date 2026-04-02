@@ -21,6 +21,8 @@ export default function Login() {
     if (result.success) {
       await loadSettings();
       login(result.data);
+      // Maximize window on successful login for full POS experience
+      window.electronAPI?.maximizeWindow();
     } else {
       setError(result.error || 'Invalid PIN');
       setShaking(true);
