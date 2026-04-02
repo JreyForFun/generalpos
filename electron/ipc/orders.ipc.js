@@ -25,16 +25,20 @@ module.exports = function registerOrderHandlers(db) {
       const seq = String((countToday?.count || 0) + 1).padStart(4, '0');
       const orderNumber = `ORD-${today}-${seq}`;
 
-      // Calculate totals
+      // Calculate totals (toFixed(2) per AI_RULES §5 — no float drift)
       let subtotal = 0;
       for (const item of items) {
-        const lineTotal = (item.price * item.quantity) - (item.discount || 0);
+        const lineTotal = Number(((item.price * item.quantity) - (item.discount || 0)).toFixed(2));
         subtotal += lineTotal;
       }
+      subtotal = Number(subtotal.toFixed(2));
 
-      const discountAmount = discount?.type === 'percent'
-        ? subtotal * (discount.value / 100)
-        : (discount?.value || 0);
+      const discountAmount = Number(
+        (discount?.type === 'percent'
+          ? subtotal * (discount.value / 100)
+          : (discount?.value || 0)
+        ).toFixed(2)
+      );
 
       const tipAmount = tip || 0;
       const total = Math.max(0, subtotal - discountAmount + tipAmount);

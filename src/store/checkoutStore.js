@@ -97,10 +97,9 @@ export const useCheckoutStore = create((set, get) => ({
 
   getDiscountAmount: () => {
     const { discount } = get();
-    if (!discount) return 0;
     const subtotal = get().getSubtotal();
 
-    // Apply customer discount if set
+    // Apply customer discount if set (independent of order discount)
     let customerDiscount = 0;
     const customer = get().customer;
     if (customer?.discount_type && customer?.discount_value) {
@@ -112,9 +111,13 @@ export const useCheckoutStore = create((set, get) => ({
       }
     }
 
-    const orderDiscount = discount.type === 'percent'
-      ? subtotal * (discount.value / 100)
-      : discount.value;
+    // Apply order-level discount
+    let orderDiscount = 0;
+    if (discount) {
+      orderDiscount = discount.type === 'percent'
+        ? subtotal * (discount.value / 100)
+        : discount.value;
+    }
 
     return Number((orderDiscount + customerDiscount).toFixed(2));
   },

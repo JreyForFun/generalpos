@@ -46,18 +46,6 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
 
-  // Window control IPC handlers
-  ipcMain.on('window:minimize', () => mainWindow?.minimize());
-  ipcMain.on('window:maximize', () => {
-    if (mainWindow?.isMaximized()) {
-      mainWindow.unmaximize();
-    } else {
-      mainWindow?.maximize();
-    }
-  });
-  ipcMain.on('window:close', () => mainWindow?.close());
-  ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized());
-
   mainWindow.on('maximize', () => {
     mainWindow?.webContents.send('window:maximized-change', true);
   });
@@ -85,6 +73,18 @@ app.whenReady().then(() => {
 
   // Register all IPC handlers
   registerAllIpcHandlers(db);
+
+  // Register window control IPC handlers ONCE (outside createWindow)
+  ipcMain.on('window:minimize', () => mainWindow?.minimize());
+  ipcMain.on('window:maximize', () => {
+    if (mainWindow?.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow?.maximize();
+    }
+  });
+  ipcMain.on('window:close', () => mainWindow?.close());
+  ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized());
 
   // Create main window
   createWindow();

@@ -17,6 +17,8 @@
   "author": "",
   "license": "UNLICENSED",
   "dependencies": {
+    "@fontsource/dm-sans": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.7.0",
     "clsx": "^2.1.1",

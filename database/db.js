@@ -7,6 +7,7 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const log = require('electron-log');
+const bcrypt = require('bcryptjs');
 const { app } = require('electron');
 
 let db = null;
@@ -41,8 +42,10 @@ function initDatabase() {
   // Run pending migrations
   runMigrations();
 
-  // Seed default settings if empty
+  // Seed defaults, admin cashier, and demo data
   seedDefaults();
+  seedAdminCashier();
+  seedDemoData();
 
   return db;
 }
@@ -116,6 +119,39 @@ function seedDefaults() {
 
   seedAll();
   log.info('Default settings seeded');
+}
+
+/**
+ * Seed an admin cashier if none exist.
+ * Default PIN: 1234 (bcrypt hashed — cannot be done in raw SQL)
+ */
+function seedAdminCashier() {
+  const cashierCount = db.prepare('SELECT COUNT(*) as count FROM cashiers').get();
+  if (cashierCount && cashierCount.count > 0) return;
+
+  const hashedPin = bcrypt.hashSync('1234', 10);
+  db.prepare('INSERT INTO cashiers (name, pin, role) VALUES (?, ?, ?)').run(
+    'Admin', hashedPin, 'admin'
+  );
+  log.info('Default admin cashier seeded (PIN: 1234)');
+}
+
+/**
+ * Seed demo categories and products if products table is empty.
+ */
+function seedDemoData() {
+  const productCount = db.prepare('SELECT COUNT(*) as count FROM products').get();
+  if (productCount && productCount.count > 0) return;
+
+  const seedPath = path.join(__dirname, 'seeds', 'demo_data.sql');
+  if (!fs.existsSync(seedPath)) {
+    log.warn('Demo data seed file not found');
+    return;
+  }
+
+  const sql = fs.readFileSync(seedPath, 'utf-8');
+  db.exec(sql);
+  log.info('Demo data seeded (categories + products)');
 }
 
 /**
