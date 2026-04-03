@@ -43,6 +43,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createCustomer: (data)    => ipcRenderer.invoke('customers:create', data),
   updateCustomer: (id, data) => ipcRenderer.invoke('customers:update', id, data),
   deleteCustomer: (id)      => ipcRenderer.invoke('customers:delete', id),
+  ewalletDeduct:  (id, amount) => ipcRenderer.invoke('customers:ewalletDeduct', id, amount),
+  ewalletTopup:   (id, amount) => ipcRenderer.invoke('customers:ewalletTopup', id, amount),
+  redeemPoints:   (id, points) => ipcRenderer.invoke('customers:redeemPoints', id, points),
 
   // ─── Cashiers ───
   getCashiers:    ()         => ipcRenderer.invoke('cashiers:getAll'),

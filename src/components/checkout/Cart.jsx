@@ -1,5 +1,6 @@
-import { Minus, Plus, X, ShoppingCart, Percent, Tag } from 'lucide-react';
+import { Minus, Plus, X, ShoppingCart, Percent, Tag, Star } from 'lucide-react';
 import { useCheckoutStore } from '../../store/checkoutStore';
+import CustomerSelect from './CustomerSelect';
 import { cn } from '../../lib/cn';
 import { useState } from 'react';
 
@@ -81,18 +82,14 @@ export default function Cart({ onPay }) {
         )}
       </div>
 
-      {/* Customer badge */}
-      {customer && (
-        <div className="mx-4 mt-3 px-3 py-2 rounded-lg bg-accent-secondary/10 border border-accent-secondary/20">
-          <p className="text-small text-accent-secondary font-medium">
-            👤 {customer.name}
-            {customer.discount_value > 0 && (
-              <span className="ml-2 text-tiny opacity-75">
-                ({customer.discount_type === 'percent' ? `${customer.discount_value}%` : `₱${customer.discount_value}`} discount)
-              </span>
-            )}
-          </p>
-        </div>
+      {/* Customer Select */}
+      <div className="px-4 mt-3 shrink-0">
+        <CustomerSelect />
+      </div>
+
+      {/* Points Redemption */}
+      {customer && customer.points > 0 && (
+        <PointsRedeem customer={customer} />
       )}
 
       {/* Cart Items */}
@@ -312,6 +309,76 @@ export default function Cart({ onPay }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Inline points redemption for the cart */
+function PointsRedeem({ customer }) {
+  const setDiscount = useCheckoutStore((s) => s.setDiscount);
+  const [points, setPoints] = useState('');
+  const [redeemed, setRedeemed] = useState(false);
+  const [redeemedDiscount, setRedeemedDiscount] = useState(0);
+
+  const handleRedeem = async () => {
+    const pts = parseInt(points, 10);
+    if (isNaN(pts) || pts <= 0 || pts > customer.points) return;
+
+    const result = await window.electronAPI.redeemPoints(customer.id, pts);
+    if (result.success) {
+      // Apply the peso discount as a fixed order discount
+      setDiscount({ type: 'fixed', value: result.data.discount });
+      setRedeemed(true);
+      setRedeemedDiscount(result.data.discount);
+    }
+  };
+
+  if (redeemed) {
+    return (
+      <div className="mx-4 mt-2 px-3 py-2 rounded-lg bg-accent-warning/10 border border-accent-warning/20 flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-small text-text-primary">
+          <Star size={12} className="text-accent-warning" />
+          Points redeemed
+        </span>
+        <span className="text-small font-semibold text-accent-primary tabular-nums">
+          -₱{redeemedDiscount.toFixed(2)}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-4 mt-2 px-3 py-2 rounded-lg border border-border">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="flex items-center gap-1 text-tiny text-text-muted">
+          <Star size={10} className="text-accent-warning" />
+          {Number(customer.points).toLocaleString()} points available
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min="1"
+          max={customer.points}
+          value={points}
+          onChange={(e) => setPoints(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleRedeem()}
+          placeholder="Points to use"
+          className="flex-1 h-8 px-2 rounded bg-bg-input border border-border text-small text-text-primary tabular-nums placeholder:text-text-muted focus:border-border-focus focus:outline-none"
+        />
+        <button
+          onClick={handleRedeem}
+          disabled={!points || Number(points) <= 0}
+          className={cn(
+            'px-3 h-8 rounded text-tiny font-semibold transition-colors',
+            points && Number(points) > 0
+              ? 'bg-accent-warning text-white hover:bg-accent-warning-hover'
+              : 'bg-bg-hover text-text-muted cursor-not-allowed'
+          )}
+        >
+          Redeem
+        </button>
+      </div>
     </div>
   );
 }
