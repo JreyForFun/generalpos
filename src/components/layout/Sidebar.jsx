@@ -1,6 +1,6 @@
 import {
   ShoppingCart, Package, ClipboardList, Users, BarChart3,
-  Boxes, UserCog, Settings, LogOut
+  Boxes, UserCog, Settings, LogOut, CreditCard
 } from 'lucide-react';
 import { useViewStore } from '../../store/viewStore';
 import { useSessionStore } from '../../store/sessionStore';
@@ -12,6 +12,7 @@ const navItems = [
   { id: 'orders',    icon: ClipboardList, label: 'Orders',     roles: 'all' },
   { id: 'products',  icon: Package,       label: 'Products',   roles: 'admin' },
   { id: 'inventory', icon: Boxes,         label: 'Inventory',  roles: 'admin' },
+  { id: 'giftcards', icon: CreditCard,    label: 'Gift Cards', roles: 'admin' },
   { id: 'customers', icon: Users,         label: 'Customers',  roles: 'all' },
   { id: 'reports',   icon: BarChart3,     label: 'Reports',    roles: 'admin' },
   { id: 'cashiers',  icon: UserCog,       label: 'Cashiers',   roles: 'admin' },

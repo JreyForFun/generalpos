@@ -4,7 +4,7 @@ import { cn } from '../../lib/cn';
  * Table — reusable data table component.
  * Supports column definitions, empty state, and responsive scrolling.
  */
-export default function Table({ columns, data, emptyMessage = 'No data found', onRowClick }) {
+export default function Table({ columns, data, emptyMessage = 'No data found', emptyIcon, onRowClick }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
       <table className="w-full border-collapse">
@@ -34,9 +34,12 @@ export default function Table({ columns, data, emptyMessage = 'No data found', o
             <tr>
               <td
                 colSpan={columns.length}
-                className="px-4 py-12 text-center text-body text-text-muted"
+                className="px-4 py-12 text-center"
               >
-                {emptyMessage}
+                {emptyIcon && (
+                  <div className="flex justify-center mb-3 text-text-muted">{emptyIcon}</div>
+                )}
+                <p className="text-body text-text-muted">{emptyMessage}</p>
               </td>
             </tr>
           ) : (

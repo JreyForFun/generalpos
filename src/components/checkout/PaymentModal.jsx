@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Banknote, ArrowRight } from 'lucide-react';
+import { Banknote, ArrowRight, CreditCard, Check } from 'lucide-react';
 import Modal from '../shared/Modal';
 import { useCheckoutStore } from '../../store/checkoutStore';
 import { useToast } from '../shared/Toast';
@@ -25,9 +25,20 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
   const [cashReceived, setCashReceived] = useState('');
   const [processing, setProcessing] = useState(false);
 
+  // Gift card state
+  const [giftCardCode, setGiftCardCode] = useState('');
+  const [giftCardAmount, setGiftCardAmount] = useState(0);
+  const [giftCardApplied, setGiftCardApplied] = useState(false);
+
+  // eWallet state
+  const [ewalletAmount, setEwalletAmount] = useState(0);
+  const [ewalletApplied, setEwalletApplied] = useState(false);
+
   const cashAmount = parseFloat(cashReceived) || 0;
-  const change = cashAmount - total;
-  const canPay = cashAmount >= total && total > 0;
+  const totalDeductions = giftCardAmount + ewalletAmount;
+  const remainingAfterGift = Math.max(0, total - totalDeductions);
+  const change = cashAmount - remainingAfterGift;
+  const canPay = cashAmount >= remainingAfterGift && total > 0;
 
   const handleQuickAmount = (amount) => {
     setCashReceived(String(amount));
@@ -87,7 +98,44 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
   const handleClose = () => {
     setCashReceived('');
     setProcessing(false);
+    setGiftCardCode('');
+    setGiftCardAmount(0);
+    setGiftCardApplied(false);
+    setEwalletAmount(0);
+    setEwalletApplied(false);
     onClose();
+  };
+
+  const handleApplyEwallet = async () => {
+    if (!customer?.id || !customer.ewallet || customer.ewallet <= 0) return;
+    const amountAfterGift = Math.max(0, total - giftCardAmount);
+    const amountToApply = Math.min(customer.ewallet, amountAfterGift);
+    if (amountToApply <= 0) return;
+
+    const result = await window.electronAPI.ewalletDeduct(customer.id, amountToApply);
+    if (result.success) {
+      setEwalletAmount(amountToApply);
+      setEwalletApplied(true);
+      toast.success(`eWallet: ₱${amountToApply.toFixed(2)} deducted`);
+    } else {
+      toast.error(result.error || 'eWallet payment failed');
+    }
+  };
+
+  const handleApplyGiftCard = async () => {
+    if (!giftCardCode.trim()) return;
+    // Try to apply the full remaining total from the gift card
+    const amountToApply = Number(total.toFixed(2));
+    const result = await window.electronAPI.redeemGiftCard(giftCardCode.trim(), amountToApply);
+    if (result.success) {
+      // Backend deducted min(balance, amountToApply). Applied = total - remainingBalance if remaining >= 0
+      const applied = Number((amountToApply - Math.max(0, result.data.remainingBalance)).toFixed(2)) || amountToApply;
+      setGiftCardAmount(amountToApply);
+      setGiftCardApplied(true);
+      toast.success(`Gift card applied! ₱${amountToApply.toFixed(2)} deducted`);
+    } else {
+      toast.error(result.error || 'Invalid gift card');
+    }
   };
 
   return (
@@ -100,6 +148,79 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
             ₱{total.toFixed(2)}
           </p>
         </div>
+
+        {/* Gift Card Section */}
+        <div className="rounded-lg border border-border p-3">
+          {!giftCardApplied ? (
+            <div className="flex items-center gap-2">
+              <CreditCard size={16} className="text-text-muted shrink-0" />
+              <input
+                type="text"
+                value={giftCardCode}
+                onChange={(e) => setGiftCardCode(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleApplyGiftCard()}
+                placeholder="Gift card code"
+                className="flex-1 h-9 px-2 rounded bg-bg-input border border-border text-small text-text-primary font-mono placeholder:text-text-muted focus:border-border-focus focus:outline-none"
+              />
+              <button
+                onClick={handleApplyGiftCard}
+                disabled={!giftCardCode.trim()}
+                className={cn(
+                  'px-3 h-9 rounded text-small font-medium transition-colors',
+                  giftCardCode.trim()
+                    ? 'bg-accent-secondary text-white hover:bg-accent-secondary-hover'
+                    : 'bg-bg-hover text-text-muted cursor-not-allowed'
+                )}
+              >
+                Apply
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Check size={16} className="text-accent-primary" />
+                <span className="text-small text-text-primary">
+                  Gift card <span className="font-mono text-accent-secondary">{giftCardCode}</span> applied
+                </span>
+              </div>
+              <span className="font-heading text-body text-accent-primary tabular-nums">
+                -₱{giftCardAmount.toFixed(2)}
+              </span>
+            </div>
+          )}
+          {giftCardApplied && remainingAfterGift > 0 && (
+            <p className="text-tiny text-text-muted mt-2">
+              Remaining to pay: ₱{remainingAfterGift.toFixed(2)}
+            </p>
+          )}
+          {giftCardApplied && remainingAfterGift <= 0 && (
+            <p className="text-tiny text-accent-primary mt-2">
+              Fully covered by gift card!
+            </p>
+          )}
+        </div>
+
+        {/* eWallet Payment */}
+        {customer && customer.ewallet > 0 && !ewalletApplied && (
+          <button
+            onClick={handleApplyEwallet}
+            className="w-full flex items-center justify-between px-4 h-12 rounded-lg border border-accent-secondary/30 bg-accent-secondary/5 text-text-primary hover:bg-accent-secondary/10 transition-colors"
+          >
+            <span className="text-small font-medium">💳 Pay with eWallet</span>
+            <span className="font-heading text-body text-accent-secondary tabular-nums">
+              ₱{Number(customer.ewallet).toFixed(2)} available
+            </span>
+          </button>
+        )}
+
+        {ewalletApplied && (
+          <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-accent-secondary/10 border border-accent-secondary/30">
+            <span className="text-small text-text-primary">💳 eWallet applied</span>
+            <span className="font-heading text-body text-accent-secondary tabular-nums">
+              -₱{ewalletAmount.toFixed(2)}
+            </span>
+          </div>
+        )}
 
         {/* Cash Received Input */}
         <div>

@@ -87,4 +87,70 @@ module.exports = function registerCustomerHandlers(db) {
       return { success: false, error: 'Failed to delete customer' };
     }
   });
+
+  // ─── eWallet ───
+  ipcMain.handle('customers:ewalletDeduct', (_event, customerId, amount) => {
+    try {
+      const session = getSession();
+      if (!session) return { success: false, error: 'No active session' };
+      if (!validate.id(customerId)) return { success: false, error: 'Invalid customer ID' };
+      if (typeof amount !== 'number' || amount <= 0) return { success: false, error: 'Invalid amount' };
+
+      const customer = db.prepare('SELECT ewallet FROM customers WHERE id = ?').get(customerId);
+      if (!customer) return { success: false, error: 'Customer not found' };
+      if (customer.ewallet < amount) return { success: false, error: 'Insufficient eWallet balance' };
+
+      db.prepare('UPDATE customers SET ewallet = ewallet - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(amount, customerId);
+      const updated = db.prepare('SELECT ewallet FROM customers WHERE id = ?').get(customerId);
+
+      writeAudit({ cashierId: session.cashierId, action: 'ewallet:deduct', targetType: 'customer', targetId: customerId, details: { amount, remaining: updated.ewallet } });
+      return { success: true, data: { remainingBalance: updated.ewallet } };
+    } catch (err) {
+      log.error('customers:ewalletDeduct failed', err);
+      return { success: false, error: 'Failed to deduct from eWallet' };
+    }
+  });
+
+  ipcMain.handle('customers:ewalletTopup', (_event, customerId, amount) => {
+    try {
+      const { authorized, session, error } = requireRole(['admin', 'manager']);
+      if (!authorized) return { success: false, error };
+      if (!validate.id(customerId)) return { success: false, error: 'Invalid customer ID' };
+
+      db.prepare('UPDATE customers SET ewallet = ewallet + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(amount, customerId);
+      const updated = db.prepare('SELECT ewallet FROM customers WHERE id = ?').get(customerId);
+
+      writeAudit({ cashierId: session.cashierId, action: 'ewallet:topup', targetType: 'customer', targetId: customerId, details: { amount, newBalance: updated.ewallet } });
+      return { success: true, data: { balance: updated.ewallet } };
+    } catch (err) {
+      log.error('customers:ewalletTopup failed', err);
+      return { success: false, error: 'Failed to top up eWallet' };
+    }
+  });
+
+  // ─── Points ───
+  ipcMain.handle('customers:redeemPoints', (_event, customerId, points) => {
+    try {
+      const session = getSession();
+      if (!session) return { success: false, error: 'No active session' };
+      if (!validate.id(customerId)) return { success: false, error: 'Invalid customer ID' };
+
+      const customer = db.prepare('SELECT points FROM customers WHERE id = ?').get(customerId);
+      if (!customer) return { success: false, error: 'Customer not found' };
+      if (customer.points < points) return { success: false, error: 'Insufficient points' };
+
+      // Convert points to peso discount (configurable rate)
+      const redeemRate = db.prepare("SELECT value FROM app_settings WHERE key = 'points_redemption_rate'").get();
+      const rate = parseFloat(redeemRate?.value || '0.01'); // default: 1 point = ₱0.01
+
+      db.prepare('UPDATE customers SET points = points - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(points, customerId);
+      const discount = Number((points * rate).toFixed(2));
+
+      writeAudit({ cashierId: session.cashierId, action: 'points:redeem', targetType: 'customer', targetId: customerId, details: { points, discount } });
+      return { success: true, data: { discount, remainingPoints: customer.points - points } };
+    } catch (err) {
+      log.error('customers:redeemPoints failed', err);
+      return { success: false, error: 'Failed to redeem points' };
+    }
+  });
 };
