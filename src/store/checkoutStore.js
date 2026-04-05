@@ -15,6 +15,9 @@ export const useCheckoutStore = create((set, get) => ({
   // Checkout flow state
   status: 'idle',       // idle | adding_items | reviewing | paying | completed
 
+  // Held orders (parallel orders)
+  heldOrders: [],       // [{ items, customer, discount, tip, notes, heldAt }]
+
   // ─── Cart Actions ───
 
   addItem: (product) => {
@@ -127,6 +130,39 @@ export const useCheckoutStore = create((set, get) => ({
     const discountAmount = get().getDiscountAmount();
     const tip = get().tip;
     return Math.max(0, Number((subtotal - discountAmount + tip).toFixed(2)));
+  },
+
+  // ─── Held Orders (Parallel Orders) ───
+
+  holdOrder: () => {
+    const { items, customer, discount, tip, notes, heldOrders } = get();
+    if (items.length === 0) return false;
+    const snapshot = { items: [...items], customer, discount, tip, notes, heldAt: new Date().toISOString() };
+    set({
+      heldOrders: [...heldOrders, snapshot],
+      items: [], customer: null, discount: null, tip: 0, notes: '', status: 'idle',
+    });
+    return true;
+  },
+
+  resumeOrder: (index) => {
+    const { heldOrders } = get();
+    if (index < 0 || index >= heldOrders.length) return false;
+    const order = heldOrders[index];
+    set({
+      items: order.items,
+      customer: order.customer,
+      discount: order.discount,
+      tip: order.tip,
+      notes: order.notes,
+      status: 'adding_items',
+      heldOrders: heldOrders.filter((_, i) => i !== index),
+    });
+    return true;
+  },
+
+  removeHeldOrder: (index) => {
+    set({ heldOrders: get().heldOrders.filter((_, i) => i !== index) });
   },
 
   // ─── Reset ───
