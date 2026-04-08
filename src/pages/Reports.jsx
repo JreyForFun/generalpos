@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, DollarSign, Package, Calendar, Users } from 'lucide-react';
+import { BarChart3, TrendingUp, DollarSign, Package, Calendar, Users, FileDown, Database } from 'lucide-react';
 import { useToast } from '../components/shared/Toast';
 import { cn } from '../lib/cn';
 
 /**
  * Reports page — daily sales dashboard with stats, payment breakdown,
- * best sellers, and cashier performance.
+ * best sellers, 7-day chart, cashier performance, and export.
  */
 export default function Reports() {
   const toast = useToast();
@@ -14,21 +14,28 @@ export default function Reports() {
   const [salesByMethod, setSalesByMethod] = useState([]);
   const [bestSellers, setBestSellers] = useState([]);
   const [cashFlows, setCashFlows] = useState([]);
+  const [weeklySales, setWeeklySales] = useState([]);
+  const [cashierPerf, setCashierPerf] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   const loadReports = async () => {
     setLoading(true);
-    const [salesRes, methodRes, sellersRes, cashRes] = await Promise.all([
+    const [salesRes, methodRes, sellersRes, cashRes, weeklyRes, perfRes] = await Promise.all([
       window.electronAPI.getDailySales(date),
       window.electronAPI.getSalesByMethod(date),
       window.electronAPI.getBestSellers(date),
       window.electronAPI.getCashFlows({ date }),
+      window.electronAPI.getWeeklySales(date),
+      window.electronAPI.getCashierPerformance(date),
     ]);
 
     if (salesRes.success) setDailySales(salesRes.data);
     if (methodRes.success) setSalesByMethod(methodRes.data);
     if (sellersRes.success) setBestSellers(sellersRes.data);
     if (cashRes.success) setCashFlows(cashRes.data);
+    if (weeklyRes.success) setWeeklySales(weeklyRes.data);
+    if (perfRes.success) setCashierPerf(perfRes.data);
     setLoading(false);
   };
 
@@ -44,6 +51,36 @@ export default function Reports() {
   // Payment method total for bar chart
   const methodTotal = salesByMethod.reduce((s, m) => s + m.total, 0) || 1;
 
+  // Weekly chart max for scaling
+  const weeklyMax = Math.max(...weeklySales.map((d) => d.total_sales), 1);
+
+  const handleExportPDF = async () => {
+    setExporting(true);
+    const result = await window.electronAPI.exportReportPDF({
+      date,
+      dailySales,
+      salesByMethod,
+      bestSellers,
+      cashFlows,
+      cashierPerformance: cashierPerf,
+    });
+    if (result.success) {
+      toast.success('Report exported!', result.data.path);
+    } else {
+      toast.error(result.error || 'Export failed');
+    }
+    setExporting(false);
+  };
+
+  const handleBackup = async () => {
+    const result = await window.electronAPI.exportBackup();
+    if (result.success) {
+      toast.success('Backup exported!', result.data.path);
+    } else if (result.error !== 'Export cancelled') {
+      toast.error(result.error || 'Backup failed');
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 h-full overflow-y-auto">
       {/* Header */}
@@ -53,7 +90,26 @@ export default function Reports() {
           <p className="text-small text-text-secondary mt-1">Daily sales dashboard</p>
         </div>
         <div className="flex items-center gap-2">
-          <Calendar size={14} className="text-text-muted" />
+          <button
+            onClick={handleBackup}
+            className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-border text-small text-text-secondary hover:bg-bg-hover transition-colors"
+            title="Export database backup"
+          >
+            <Database size={14} /> Backup
+          </button>
+          <button
+            onClick={handleExportPDF}
+            disabled={exporting}
+            className={cn(
+              'flex items-center gap-1.5 px-3 h-9 rounded-lg text-small font-medium transition-colors',
+              exporting
+                ? 'bg-bg-hover text-text-muted cursor-not-allowed'
+                : 'bg-accent-secondary text-white hover:bg-accent-secondary-hover'
+            )}
+          >
+            <FileDown size={14} /> {exporting ? 'Exporting...' : 'Export PDF'}
+          </button>
+          <Calendar size={14} className="text-text-muted ml-2" />
           <input
             type="date"
             value={date}
@@ -89,6 +145,43 @@ export default function Reports() {
           label="Tips"
           value={`₱${Number(dailySales?.total_tips || 0).toFixed(2)}`}
         />
+      </div>
+
+      {/* 7-Day Sales Chart */}
+      <div className="rounded-xl border border-border bg-bg-secondary p-5 shrink-0">
+        <h2 className="text-body font-semibold text-text-primary mb-4">Sales — Last 7 Days</h2>
+        {weeklySales.length === 0 ? (
+          <p className="text-small text-text-muted text-center py-8">No sales data</p>
+        ) : (
+          <div className="flex items-end gap-2 h-40">
+            {weeklySales.map((day) => {
+              const pct = (day.total_sales / weeklyMax) * 100;
+              const isToday = day.date === date;
+              const dayLabel = new Date(day.date + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short' });
+              return (
+                <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
+                  <span className="text-tiny text-text-muted tabular-nums">
+                    {day.total_orders > 0 ? `₱${Number(day.total_sales).toFixed(0)}` : ''}
+                  </span>
+                  <div
+                    className={cn(
+                      'w-full rounded-t-md transition-all duration-500',
+                      isToday ? 'bg-accent-primary' : 'bg-accent-primary/30'
+                    )}
+                    style={{ height: `${Math.max(pct, 2)}%` }}
+                    title={`₱${Number(day.total_sales).toFixed(2)} • ${day.total_orders} orders`}
+                  />
+                  <span className={cn(
+                    'text-tiny',
+                    isToday ? 'text-accent-primary font-semibold' : 'text-text-muted'
+                  )}>
+                    {dayLabel}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-6">
@@ -149,6 +242,38 @@ export default function Reports() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Cashier Performance */}
+      <div className="rounded-xl border border-border bg-bg-secondary p-5 shrink-0">
+        <h2 className="text-body font-semibold text-text-primary mb-4 flex items-center gap-2">
+          <Users size={16} /> Cashier Performance
+        </h2>
+        {cashierPerf.length === 0 ? (
+          <p className="text-small text-text-muted text-center py-4">No cashier data</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-2">
+            {/* Header row */}
+            <div className="grid grid-cols-4 px-3 py-2 text-tiny text-text-muted uppercase tracking-wider">
+              <span>Cashier</span>
+              <span className="text-right">Orders</span>
+              <span className="text-right">Total Sales</span>
+              <span className="text-right">Avg Order</span>
+            </div>
+            {cashierPerf.map((c) => (
+              <div key={c.id} className="grid grid-cols-4 items-center px-3 py-2.5 rounded-lg bg-bg-tertiary">
+                <span className="text-body text-text-primary font-medium">{c.name}</span>
+                <span className="text-body text-text-primary tabular-nums text-right">{c.total_orders}</span>
+                <span className="text-body font-semibold text-accent-primary tabular-nums text-right">
+                  ₱{Number(c.total_sales).toFixed(2)}
+                </span>
+                <span className="text-small text-text-secondary tabular-nums text-right">
+                  ₱{Number(c.avg_order).toFixed(2)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Cash Flow Summary */}

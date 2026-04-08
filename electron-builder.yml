@@ -1,0 +1,49 @@
+appId: com.flexpos.app
+productName: FlexPOS
+copyright: Copyright © 2026 FlexPOS
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - "dist/**/*"
+  - "electron/**/*"
+  - "database/**/*"
+  - "package.json"
+
+extraMetadata:
+  main: electron/main.js
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: public/icons/icon.png
+  artifactName: FlexPOS-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+  installerIcon: public/icons/icon.png
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  icon: public/icons/icon.png
+  artifactName: FlexPOS-${version}.${ext}
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  icon: public/icons/icon.png
+  artifactName: FlexPOS-${version}.${ext}
+
+asar: true

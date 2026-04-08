@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createProduct:  (data)    => ipcRenderer.invoke('products:create', data),
   updateProduct:  (id, data) => ipcRenderer.invoke('products:update', id, data),
   deleteProduct:  (id)      => ipcRenderer.invoke('products:delete', id),
+  findByBarcode:  (barcode) => ipcRenderer.invoke('products:findByBarcode', barcode),
 
   // ─── Categories ───
   getCategories:  () => ipcRenderer.invoke('categories:getAll'),
@@ -64,10 +65,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getCashFlows:   (filters) => ipcRenderer.invoke('cashflows:getAll', filters),
 
   // ─── Reports ───
-  getDailySales:  (date)    => ipcRenderer.invoke('reports:dailySales', date),
-  getSalesByMethod: (date)  => ipcRenderer.invoke('reports:salesByMethod', date),
-  getBestSellers: (date)    => ipcRenderer.invoke('reports:bestSellers', date),
-  exportReportPDF: (data)   => ipcRenderer.invoke('reports:exportPDF', data),
+  getDailySales:    (date)   => ipcRenderer.invoke('reports:dailySales', date),
+  getSalesByMethod: (date)   => ipcRenderer.invoke('reports:salesByMethod', date),
+  getBestSellers:   (date)   => ipcRenderer.invoke('reports:bestSellers', date),
+  getWeeklySales:   (date)   => ipcRenderer.invoke('reports:weeklySales', date),
+  getCashierPerformance: (date) => ipcRenderer.invoke('reports:cashierPerformance', date),
+  exportReportPDF:  (data)   => ipcRenderer.invoke('reports:exportPDF', data),
+
+  // ─── Backup ───
+  exportBackup:     ()       => ipcRenderer.invoke('backup:export'),
 
   // ─── Settings ───
   getSettings:    ()          => ipcRenderer.invoke('settings:getAll'),

@@ -295,6 +295,28 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
           </div>
         )}
 
+        {/* Fixed Tip Input */}
+        <div className="flex items-center gap-3">
+          <label className="text-small text-text-secondary whitespace-nowrap">Tip (₱)</label>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={tip || ''}
+            onChange={(e) => setTip(parseFloat(e.target.value) || 0)}
+            placeholder="0"
+            className="flex-1 h-10 px-3 rounded-lg bg-bg-input border border-border text-body text-text-primary tabular-nums placeholder:text-text-muted focus:border-border-focus focus:outline-none"
+          />
+          {tip > 0 && (
+            <button
+              onClick={() => setTip(0)}
+              className="text-small text-accent-danger hover:underline"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
         {/* Notes */}
         <div>
           <label className="text-small text-text-secondary mb-1 block">Order Notes (optional)</label>

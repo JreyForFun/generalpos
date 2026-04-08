@@ -9,7 +9,7 @@ import { useState } from 'react';
  * Shows item list, quantity controls, discounts, subtotal/total, and Pay button.
  * DESIGN_SYSTEM §5.3 Cart Item Card spec.
  */
-export default function Cart({ onPay }) {
+export default function Cart({ onPay, onSplitPay }) {
   const items = useCheckoutStore((s) => s.items);
   const customer = useCheckoutStore((s) => s.customer);
   const tip = useCheckoutStore((s) => s.tip);
@@ -322,7 +322,7 @@ export default function Cart({ onPay }) {
             </span>
           </div>
 
-          {/* Hold + Pay Buttons */}
+          {/* Hold + Split + Pay Buttons */}
           <div className="flex gap-2">
             {items.length > 0 && (
               <button
@@ -331,6 +331,15 @@ export default function Cart({ onPay }) {
                 title="Hold order"
               >
                 <Pause size={20} />
+              </button>
+            )}
+            {items.length > 0 && onSplitPay && (
+              <button
+                onClick={onSplitPay}
+                className="h-14 px-5 rounded-xl border border-accent-info text-accent-info font-heading text-h3 font-bold hover:bg-accent-info/10 active:scale-[0.98] transition-all duration-150 shrink-0"
+                title="Split payment"
+              >
+                Split
               </button>
             )}
             <button

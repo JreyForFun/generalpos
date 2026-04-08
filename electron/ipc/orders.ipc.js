@@ -78,12 +78,21 @@ module.exports = function registerOrderHandlers(db) {
           }
         }
 
-        // Insert payment record
+        // Insert payment record(s)
         if (payment) {
-          db.prepare(`
+          const insertPayment = db.prepare(`
             INSERT INTO payments (order_id, method, amount, payer_name)
             VALUES (?, ?, ?, ?)
-          `).run(orderId, payment.method, payment.amount, payment.payerName || null);
+          `);
+
+          // Split payments: insert one row per payer
+          if (Array.isArray(orderData.splitPayments) && orderData.splitPayments.length > 0) {
+            for (const sp of orderData.splitPayments) {
+              insertPayment.run(orderId, sp.method, sp.amount, sp.name || null);
+            }
+          } else {
+            insertPayment.run(orderId, payment.method, payment.amount, payment.payerName || null);
+          }
         }
 
         // Award loyalty points if customer is set

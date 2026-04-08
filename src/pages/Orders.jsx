@@ -22,6 +22,8 @@ export default function Orders() {
   const [statusFilter, setStatusFilter] = useState('');
   const [cashiers, setCashiers] = useState([]);
   const [cashierFilter, setCashierFilter] = useState('');
+  const [customers, setCustomers] = useState([]);
+  const [customerFilter, setCustomerFilter] = useState('');
 
   const loadOrders = async () => {
     setLoading(true);
@@ -29,6 +31,7 @@ export default function Orders() {
     if (dateFilter) filters.date = dateFilter;
     if (statusFilter) filters.status = statusFilter;
     if (cashierFilter) filters.cashierId = Number(cashierFilter);
+    if (customerFilter) filters.customerId = Number(customerFilter);
 
     const result = await window.electronAPI.getOrders(filters);
     if (result.success) setOrders(result.data);
@@ -40,8 +43,13 @@ export default function Orders() {
     if (result?.success) setCashiers(result.data);
   };
 
-  useEffect(() => { loadCashiers(); }, []);
-  useEffect(() => { loadOrders(); }, [dateFilter, statusFilter, cashierFilter]);
+  const loadCustomers = async () => {
+    const result = await window.electronAPI.getCustomers?.({});
+    if (result?.success) setCustomers(result.data);
+  };
+
+  useEffect(() => { loadCashiers(); loadCustomers(); }, []);
+  useEffect(() => { loadOrders(); }, [dateFilter, statusFilter, cashierFilter, customerFilter]);
 
   const handleViewOrder = async (order) => {
     const result = await window.electronAPI.getOrder(order.id);
@@ -175,6 +183,18 @@ export default function Orders() {
           >
             <option value="">All Cashiers</option>
             {cashiers.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        )}
+        {customers.length > 0 && (
+          <select
+            value={customerFilter}
+            onChange={(e) => setCustomerFilter(e.target.value)}
+            className="h-9 px-3 rounded-lg bg-bg-input border border-border text-small text-text-primary focus:border-border-focus focus:outline-none"
+          >
+            <option value="">All Customers</option>
+            {customers.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>

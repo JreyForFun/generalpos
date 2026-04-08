@@ -1,25 +1,21 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Delete } from 'lucide-react';
+import { Delete, ArrowRight } from 'lucide-react';
 import { cn } from '../../lib/cn';
 
 /**
- * PinPad — 4-6 digit PIN entry keypad.
+ * PinPad — variable-length PIN entry keypad (4–8 digits).
  * Used on Login screen and IdleLock overlay.
+ * Submits on Enter key or Submit button press — NOT auto-submit at fixed length.
  */
-export default function PinPad({ onSubmit, error, pinLength = 4 }) {
+export default function PinPad({ onSubmit, error, minLength = 4, maxLength = 8 }) {
   const [pin, setPin] = useState('');
 
   const handleDigit = useCallback((digit) => {
     setPin((prev) => {
-      const next = prev + digit;
-      if (next.length >= pinLength) {
-        // Auto-submit when PIN is complete
-        setTimeout(() => onSubmit(next), 100);
-        return next;
-      }
-      return next;
+      if (prev.length >= maxLength) return prev;
+      return prev + digit;
     });
-  }, [onSubmit, pinLength]);
+  }, [maxLength]);
 
   const handleDelete = useCallback(() => {
     setPin((prev) => prev.slice(0, -1));
@@ -28,6 +24,12 @@ export default function PinPad({ onSubmit, error, pinLength = 4 }) {
   const handleClear = useCallback(() => {
     setPin('');
   }, []);
+
+  const handleSubmit = useCallback(() => {
+    if (pin.length >= minLength) {
+      onSubmit(pin);
+    }
+  }, [pin, minLength, onSubmit]);
 
   // Clear PIN on error change
   useEffect(() => {
@@ -45,17 +47,21 @@ export default function PinPad({ onSubmit, error, pinLength = 4 }) {
         handleDelete();
       } else if (e.key === 'Escape') {
         handleClear();
+      } else if (e.key === 'Enter') {
+        handleSubmit();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleDigit, handleDelete, handleClear]);
+  }, [handleDigit, handleDelete, handleClear, handleSubmit]);
+
+  const canSubmit = pin.length >= minLength;
 
   return (
     <div className="flex flex-col items-center gap-6">
-      {/* PIN dots display */}
+      {/* PIN dots display — shows filled dots for entered digits, empty for remaining min */}
       <div className="flex items-center gap-3">
-        {Array.from({ length: pinLength }).map((_, i) => (
+        {Array.from({ length: Math.max(minLength, pin.length) }).map((_, i) => (
           <div
             key={i}
             className={cn(
@@ -85,7 +91,7 @@ export default function PinPad({ onSubmit, error, pinLength = 4 }) {
           </button>
         ))}
 
-        {/* Bottom row: Clear, 0, Backspace */}
+        {/* Bottom row: Clear, 0, Submit */}
         <button
           onClick={handleClear}
           className="w-[72px] h-[72px] rounded-2xl bg-bg-hover text-text-muted text-small font-medium hover:bg-bg-active hover:text-text-secondary transition-all duration-100"
@@ -99,11 +105,16 @@ export default function PinPad({ onSubmit, error, pinLength = 4 }) {
           0
         </button>
         <button
-          onClick={handleDelete}
-          className="w-[72px] h-[72px] rounded-2xl bg-bg-hover text-text-secondary hover:bg-bg-active hover:text-accent-danger flex items-center justify-center transition-all duration-100"
-          aria-label="Delete"
+          onClick={canSubmit ? handleSubmit : handleDelete}
+          className={cn(
+            'w-[72px] h-[72px] rounded-2xl flex items-center justify-center transition-all duration-100',
+            canSubmit
+              ? 'bg-accent-primary text-text-inverse hover:bg-accent-primary-hover active:scale-95'
+              : 'bg-bg-hover text-text-secondary hover:bg-bg-active hover:text-accent-danger'
+          )}
+          aria-label={canSubmit ? 'Submit' : 'Delete'}
         >
-          <Delete size={24} />
+          {canSubmit ? <ArrowRight size={24} /> : <Delete size={24} />}
         </button>
       </div>
     </div>
