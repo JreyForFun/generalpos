@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import ProductGrid from '../components/checkout/ProductGrid';
 import Cart from '../components/checkout/Cart';
 import PaymentModal from '../components/checkout/PaymentModal';
+import SplitPaymentModal from '../components/checkout/SplitPaymentModal';
 import ReceiptModal from '../components/checkout/ReceiptModal';
 import { useCheckoutStore } from '../store/checkoutStore';
 import { useSessionStore } from '../store/sessionStore';
@@ -17,6 +18,7 @@ export default function Checkout() {
   const session = useSessionStore((s) => s.session);
 
   const [showPayment, setShowPayment] = useState(false);
+  const [showSplit, setShowSplit] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
   const [lastCash, setLastCash] = useState(0);
@@ -25,6 +27,11 @@ export default function Checkout() {
   const handlePay = () => {
     if (items.length === 0) return;
     setShowPayment(true);
+  };
+
+  const handleSplitPay = () => {
+    if (items.length === 0) return;
+    setShowSplit(true);
   };
 
   // Listen for F9 shortcut
@@ -46,8 +53,9 @@ export default function Checkout() {
     setLastCash(cashReceived);
     setLastChange(change);
 
-    // Close payment, show receipt
+    // Close payment/split, show receipt
     setShowPayment(false);
+    setShowSplit(false);
     setShowReceipt(true);
 
     // Clear cart for next order
@@ -68,13 +76,20 @@ export default function Checkout() {
 
       {/* Cart Panel — fixed 380px */}
       <div className="w-[380px] shrink-0">
-        <Cart onPay={handlePay} />
+        <Cart onPay={handlePay} onSplitPay={handleSplitPay} />
       </div>
 
       {/* Payment Modal */}
       <PaymentModal
         isOpen={showPayment}
         onClose={() => setShowPayment(false)}
+        onComplete={handlePaymentComplete}
+      />
+
+      {/* Split Payment Modal */}
+      <SplitPaymentModal
+        isOpen={showSplit}
+        onClose={() => setShowSplit(false)}
         onComplete={handlePaymentComplete}
       />
 

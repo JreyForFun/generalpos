@@ -50,7 +50,7 @@ module.exports = function registerProductHandlers(db) {
     }
   });
 
-  // Create product (admin/manager only)
+  // Create product with variants and barcodes (admin/manager only)
   ipcMain.handle('products:create', (_event, data) => {
     try {
       const { authorized, session, error } = requireRole(['admin', 'manager']);
@@ -59,78 +59,140 @@ module.exports = function registerProductHandlers(db) {
       const { valid, errors } = validateFields(data, { name: 'text', price: 'amount' });
       if (!valid) return { success: false, error: errors.join(', ') };
 
-      const result = db.prepare(`
-        INSERT INTO products (name, description, category_id, price, cost, stock, low_stock_alert, is_available, image_path)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        data.name.trim(),
-        data.description || null,
-        data.category_id || null,
-        data.price,
-        data.cost || 0,
-        data.stock || 0,
-        data.low_stock_alert || 5,
-        data.is_available !== undefined ? (data.is_available ? 1 : 0) : 1,
-        data.image_path || null
-      );
+      const createTx = db.transaction(() => {
+        const result = db.prepare(`
+          INSERT INTO products (name, description, category_id, price, cost, stock, low_stock_alert, is_available, image_path)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          data.name.trim(),
+          data.description || null,
+          data.category_id || null,
+          data.price,
+          data.cost || 0,
+          data.stock || 0,
+          data.low_stock_alert || 5,
+          data.is_available !== undefined ? (data.is_available ? 1 : 0) : 1,
+          data.image_path || null
+        );
+
+        const productId = result.lastInsertRowid;
+
+        // Insert variants
+        if (Array.isArray(data.variants) && data.variants.length > 0) {
+          const insertVariant = db.prepare(
+            'INSERT INTO product_variants (product_id, name, sku, price, stock, is_available) VALUES (?, ?, ?, ?, ?, ?)'
+          );
+          for (const v of data.variants) {
+            if (v.name?.trim()) {
+              insertVariant.run(productId, v.name.trim(), v.sku || null, v.price || 0, v.stock || 0, v.is_available ? 1 : 0);
+            }
+          }
+        }
+
+        // Insert barcodes
+        if (Array.isArray(data.barcodes) && data.barcodes.length > 0) {
+          const insertBarcode = db.prepare(
+            'INSERT OR IGNORE INTO product_barcodes (product_id, barcode) VALUES (?, ?)'
+          );
+          for (const code of data.barcodes) {
+            if (typeof code === 'string' && code.trim()) {
+              insertBarcode.run(productId, code.trim());
+            }
+          }
+        }
+
+        return productId;
+      });
+
+      const productId = createTx();
 
       writeAudit({
         cashierId: session.cashierId,
         action: 'product:create',
         targetType: 'product',
-        targetId: result.lastInsertRowid,
-        details: { name: data.name, price: data.price },
+        targetId: productId,
+        details: { name: data.name, price: data.price, variantCount: data.variants?.length || 0, barcodeCount: data.barcodes?.length || 0 },
       });
 
-      return { success: true, data: { id: result.lastInsertRowid } };
+      return { success: true, data: { id: productId } };
     } catch (err) {
       log.error('products:create failed', err);
       return { success: false, error: 'Failed to create product' };
     }
   });
 
-  // Update product (admin/manager only)
+  // Update product with variants and barcodes (admin/manager only)
   ipcMain.handle('products:update', (_event, id, data) => {
     try {
       const { authorized, session, error } = requireRole(['admin', 'manager']);
       if (!authorized) return { success: false, error };
       if (!validate.id(id)) return { success: false, error: 'Invalid ID' };
 
-      const updates = [];
-      const params = [];
+      const updateTx = db.transaction(() => {
+        // Update product fields
+        const updates = [];
+        const params = [];
 
-      const fieldMap = {
-        name: { col: 'name', transform: (v) => v.trim() },
-        description: { col: 'description' },
-        category_id: { col: 'category_id' },
-        price: { col: 'price' },
-        cost: { col: 'cost' },
-        stock: { col: 'stock' },
-        low_stock_alert: { col: 'low_stock_alert' },
-        is_available: { col: 'is_available', transform: (v) => v ? 1 : 0 },
-        image_path: { col: 'image_path' },
-      };
+        const fieldMap = {
+          name: { col: 'name', transform: (v) => v.trim() },
+          description: { col: 'description' },
+          category_id: { col: 'category_id' },
+          price: { col: 'price' },
+          cost: { col: 'cost' },
+          stock: { col: 'stock' },
+          low_stock_alert: { col: 'low_stock_alert' },
+          is_available: { col: 'is_available', transform: (v) => v ? 1 : 0 },
+          image_path: { col: 'image_path' },
+        };
 
-      for (const [key, config] of Object.entries(fieldMap)) {
-        if (data[key] !== undefined) {
-          updates.push(`${config.col} = ?`);
-          params.push(config.transform ? config.transform(data[key]) : data[key]);
+        for (const [key, config] of Object.entries(fieldMap)) {
+          if (data[key] !== undefined) {
+            updates.push(`${config.col} = ?`);
+            params.push(config.transform ? config.transform(data[key]) : data[key]);
+          }
         }
-      }
 
-      if (updates.length === 0) return { success: false, error: 'No fields to update' };
+        if (updates.length > 0) {
+          updates.push('updated_at = CURRENT_TIMESTAMP');
+          params.push(id);
+          db.prepare(`UPDATE products SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+        }
 
-      updates.push('updated_at = CURRENT_TIMESTAMP');
-      params.push(id);
+        // Sync variants (delete-and-reinsert strategy)
+        if (Array.isArray(data.variants)) {
+          db.prepare('DELETE FROM product_variants WHERE product_id = ?').run(id);
+          const insertVariant = db.prepare(
+            'INSERT INTO product_variants (product_id, name, sku, price, stock, is_available) VALUES (?, ?, ?, ?, ?, ?)'
+          );
+          for (const v of data.variants) {
+            if (v.name?.trim()) {
+              insertVariant.run(id, v.name.trim(), v.sku || null, v.price || 0, v.stock || 0, v.is_available ? 1 : 0);
+            }
+          }
+        }
 
-      db.prepare(`UPDATE products SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+        // Sync barcodes (delete-and-reinsert strategy)
+        if (Array.isArray(data.barcodes)) {
+          db.prepare('DELETE FROM product_barcodes WHERE product_id = ?').run(id);
+          const insertBarcode = db.prepare(
+            'INSERT OR IGNORE INTO product_barcodes (product_id, barcode) VALUES (?, ?)'
+          );
+          for (const code of data.barcodes) {
+            if (typeof code === 'string' && code.trim()) {
+              insertBarcode.run(id, code.trim());
+            }
+          }
+        }
+      });
+
+      updateTx();
 
       writeAudit({
         cashierId: session.cashierId,
         action: 'product:update',
         targetType: 'product',
         targetId: id,
-        details: data,
+        details: { ...data, variantCount: data.variants?.length, barcodeCount: data.barcodes?.length },
       });
 
       return { success: true };
@@ -162,6 +224,24 @@ module.exports = function registerProductHandlers(db) {
     } catch (err) {
       log.error('products:delete failed', err);
       return { success: false, error: 'Failed to delete product' };
+    }
+  });
+
+  // ─── Barcode Lookup ───
+  ipcMain.handle('products:findByBarcode', (_event, barcode) => {
+    try {
+      if (!barcode || typeof barcode !== 'string') return { success: false, error: 'Invalid barcode' };
+
+      const barcodeEntry = db.prepare(
+        'SELECT pb.product_id, p.name, p.price, p.stock, p.is_available FROM product_barcodes pb JOIN products p ON pb.product_id = p.id WHERE pb.barcode = ?'
+      ).get(barcode.trim());
+
+      if (!barcodeEntry) return { success: false, error: 'No product found for this barcode' };
+
+      return { success: true, data: barcodeEntry };
+    } catch (err) {
+      log.error('products:findByBarcode failed', err);
+      return { success: false, error: 'Failed to look up barcode' };
     }
   });
 

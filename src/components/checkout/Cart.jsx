@@ -1,4 +1,4 @@
-import { Minus, Plus, X, ShoppingCart, Percent, Tag, Star } from 'lucide-react';
+import { Minus, Plus, X, ShoppingCart, Percent, Tag, Star, Pause, Play } from 'lucide-react';
 import { useCheckoutStore } from '../../store/checkoutStore';
 import CustomerSelect from './CustomerSelect';
 import { cn } from '../../lib/cn';
@@ -9,7 +9,7 @@ import { useState } from 'react';
  * Shows item list, quantity controls, discounts, subtotal/total, and Pay button.
  * DESIGN_SYSTEM §5.3 Cart Item Card spec.
  */
-export default function Cart({ onPay }) {
+export default function Cart({ onPay, onSplitPay }) {
   const items = useCheckoutStore((s) => s.items);
   const customer = useCheckoutStore((s) => s.customer);
   const tip = useCheckoutStore((s) => s.tip);
@@ -23,6 +23,9 @@ export default function Cart({ onPay }) {
   const getDiscountAmount = useCheckoutStore((s) => s.getDiscountAmount);
   const getTotal = useCheckoutStore((s) => s.getTotal);
   const clearCart = useCheckoutStore((s) => s.clearCart);
+  const holdOrder = useCheckoutStore((s) => s.holdOrder);
+  const resumeOrder = useCheckoutStore((s) => s.resumeOrder);
+  const heldOrders = useCheckoutStore((s) => s.heldOrders);
 
   const [showOrderDiscount, setShowOrderDiscount] = useState(false);
   const [discountType, setDiscountType] = useState('percent');
@@ -81,6 +84,25 @@ export default function Cart({ onPay }) {
           </button>
         )}
       </div>
+
+      {/* Held Orders Bar */}
+      {heldOrders.length > 0 && (
+        <div className="px-4 py-2 border-b border-border shrink-0">
+          <p className="text-tiny text-text-muted uppercase tracking-wider mb-1.5">Held Orders ({heldOrders.length})</p>
+          <div className="flex gap-1.5 overflow-x-auto">
+            {heldOrders.map((held, i) => (
+              <button
+                key={i}
+                onClick={() => resumeOrder(i)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent-warning/10 border border-accent-warning/30 text-small text-text-primary hover:bg-accent-warning/20 transition-colors shrink-0"
+              >
+                <Play size={10} className="text-accent-warning" />
+                <span>{held.items.length} items</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Customer Select */}
       <div className="px-4 mt-3 shrink-0">
@@ -300,13 +322,33 @@ export default function Cart({ onPay }) {
             </span>
           </div>
 
-          {/* Pay Button — DESIGN_SYSTEM §5.1 Pay Button */}
-          <button
-            onClick={onPay}
-            className="w-full h-14 rounded-xl bg-accent-primary text-text-inverse font-heading text-h3 font-bold shadow-glow hover:bg-accent-primary-hover hover:shadow-[0_0_30px_rgba(0,212,170,0.25)] active:scale-[0.98] transition-all duration-150"
-          >
-            Pay ₱{total.toFixed(2)}
-          </button>
+          {/* Hold + Split + Pay Buttons */}
+          <div className="flex gap-2">
+            {items.length > 0 && (
+              <button
+                onClick={() => holdOrder()}
+                className="h-14 px-5 rounded-xl border border-accent-warning text-accent-warning font-heading text-h3 font-bold hover:bg-accent-warning/10 active:scale-[0.98] transition-all duration-150 shrink-0"
+                title="Hold order"
+              >
+                <Pause size={20} />
+              </button>
+            )}
+            {items.length > 0 && onSplitPay && (
+              <button
+                onClick={onSplitPay}
+                className="h-14 px-5 rounded-xl border border-accent-info text-accent-info font-heading text-h3 font-bold hover:bg-accent-info/10 active:scale-[0.98] transition-all duration-150 shrink-0"
+                title="Split payment"
+              >
+                Split
+              </button>
+            )}
+            <button
+              onClick={onPay}
+              className="flex-1 h-14 rounded-xl bg-accent-primary text-text-inverse font-heading text-h3 font-bold shadow-glow hover:bg-accent-primary-hover hover:shadow-[0_0_30px_rgba(0,212,170,0.25)] active:scale-[0.98] transition-all duration-150"
+            >
+              Pay ₱{total.toFixed(2)}
+            </button>
+          </div>
         </div>
       )}
     </div>
