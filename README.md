@@ -1,7 +1,7 @@
 # PREPPING SKILLS DONE
 
 
- - PHASE 5 - NEAR
+ - PHASE 5 - Planning
  - Review phases
  - flex
  - 
