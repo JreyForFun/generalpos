@@ -4,6 +4,7 @@ import Modal from '../shared/Modal';
 import { useCheckoutStore } from '../../store/checkoutStore';
 import { useToast } from '../shared/Toast';
 import { cn } from '../../lib/cn';
+import { formatCurrencyRaw } from '../../lib/formatCurrency';
 
 /**
  * PaymentModal — cash payment flow.
@@ -116,7 +117,7 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
     if (result.success) {
       setEwalletAmount(amountToApply);
       setEwalletApplied(true);
-      toast.success(`eWallet: ₱${amountToApply.toFixed(2)} deducted`);
+      toast.success(`eWallet: ${formatCurrencyRaw(amountToApply)} deducted`);
     } else {
       toast.error(result.error || 'eWallet payment failed');
     }
@@ -124,15 +125,18 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
 
   const handleApplyGiftCard = async () => {
     if (!giftCardCode.trim()) return;
-    // Try to apply the full remaining total from the gift card
     const amountToApply = Number(total.toFixed(2));
     const result = await window.electronAPI.redeemGiftCard(giftCardCode.trim(), amountToApply);
     if (result.success) {
-      // Backend deducted min(balance, amountToApply). Applied = total - remainingBalance if remaining >= 0
-      const applied = Number((amountToApply - Math.max(0, result.data.remainingBalance)).toFixed(2)) || amountToApply;
-      setGiftCardAmount(amountToApply);
+      // Backend returns `applied` = min(card balance, total)
+      const applied = result.data.applied || amountToApply;
+      setGiftCardAmount(applied);
       setGiftCardApplied(true);
-      toast.success(`Gift card applied! ₱${amountToApply.toFixed(2)} deducted`);
+      if (applied < amountToApply) {
+        toast.success(`Gift card partially applied: ${formatCurrencyRaw(applied)} (pay remainder in cash)`);
+      } else {
+        toast.success(`Gift card applied! ${formatCurrencyRaw(applied)} deducted`);
+      }
     } else {
       toast.error(result.error || 'Invalid gift card');
     }
@@ -145,7 +149,7 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
         <div className="text-center py-4 rounded-xl bg-bg-primary border border-border">
           <p className="text-small text-text-muted uppercase tracking-wider mb-1">Total Due</p>
           <p className="font-heading text-display text-accent-primary tabular-nums">
-            ₱{total.toFixed(2)}
+            {formatCurrencyRaw(total)}
           </p>
         </div>
 
@@ -184,13 +188,13 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
                 </span>
               </div>
               <span className="font-heading text-body text-accent-primary tabular-nums">
-                -₱{giftCardAmount.toFixed(2)}
+                -{formatCurrencyRaw(giftCardAmount)}
               </span>
             </div>
           )}
           {giftCardApplied && remainingAfterGift > 0 && (
             <p className="text-tiny text-text-muted mt-2">
-              Remaining to pay: ₱{remainingAfterGift.toFixed(2)}
+              Remaining to pay: {formatCurrencyRaw(remainingAfterGift)}
             </p>
           )}
           {giftCardApplied && remainingAfterGift <= 0 && (
@@ -208,7 +212,7 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
           >
             <span className="text-small font-medium">💳 Pay with eWallet</span>
             <span className="font-heading text-body text-accent-secondary tabular-nums">
-              ₱{Number(customer.ewallet).toFixed(2)} available
+              {formatCurrencyRaw(customer.ewallet)} available
             </span>
           </button>
         )}
@@ -217,7 +221,7 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
           <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-accent-secondary/10 border border-accent-secondary/30">
             <span className="text-small text-text-primary">💳 eWallet applied</span>
             <span className="font-heading text-body text-accent-secondary tabular-nums">
-              -₱{ewalletAmount.toFixed(2)}
+              -{formatCurrencyRaw(ewalletAmount)}
             </span>
           </div>
         )}
@@ -280,7 +284,7 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
               'font-heading text-display tabular-nums',
               canPay ? 'text-accent-primary' : 'text-accent-danger'
             )}>
-              {canPay ? `₱${change.toFixed(2)}` : `-₱${Math.abs(change).toFixed(2)}`}
+              {canPay ? formatCurrencyRaw(change) : `-${formatCurrencyRaw(Math.abs(change))}`}
             </p>
 
             {/* Change to Tip */}
@@ -289,7 +293,7 @@ export default function PaymentModal({ isOpen, onClose, onComplete }) {
                 onClick={handleChangeToTip}
                 className="mt-2 text-small text-accent-info hover:underline"
               >
-                Add ₱{change.toFixed(2)} as tip
+                Add {formatCurrencyRaw(change)} as tip
               </button>
             )}
           </div>

@@ -11,6 +11,7 @@ import Cashiers from './pages/Cashiers';
 import Inventory from './pages/Inventory';
 import GiftCards from './pages/GiftCards';
 import Settings from './pages/Settings';
+import Manual from './pages/Manual';
 import IdleLock from './components/layout/IdleLock';
 
 const views = {
@@ -23,6 +24,7 @@ const views = {
   inventory: Inventory,
   giftcards: GiftCards,
   settings:  Settings,
+  manual:    Manual,
 };
 
 export default function App() {

@@ -5,6 +5,7 @@ import { useIpc } from '../../hooks/useIpc';
 import SearchBar from '../shared/SearchBar';
 import { useToast } from '../shared/Toast';
 import { cn } from '../../lib/cn';
+import { formatCurrencyRaw } from '../../lib/formatCurrency';
 
 /**
  * ProductGrid — browsable product cards with category filter tabs.
@@ -144,13 +145,13 @@ function ProductCard({ product, onClick }) {
       </div>
 
       {/* Product Name */}
-      <p className="text-body font-semibold text-text-primary w-full truncate text-center">
+      <p className="text-body font-semibold text-text-primary w-full line-clamp-2 text-center">
         {product.name}
       </p>
 
       {/* Price */}
       <p className="font-heading text-h3 text-accent-primary tabular-nums">
-        ₱{Number(product.price).toFixed(2)}
+        {formatCurrencyRaw(product.price)}
       </p>
 
       {/* Out of stock badge */}

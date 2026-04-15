@@ -4,8 +4,11 @@ import Table from '../components/shared/Table';
 import SearchBar from '../components/shared/SearchBar';
 import Modal from '../components/shared/Modal';
 import ConfirmModal from '../components/shared/ConfirmModal';
+import CustomSelect from '../components/shared/CustomSelect';
+import { SkeletonTable } from '../components/shared/Skeleton';
 import { useToast } from '../components/shared/Toast';
 import { cn } from '../lib/cn';
+import { formatCurrencyRaw } from '../lib/formatCurrency';
 
 /**
  * Orders page — order history with filters, detail view, and refund.
@@ -94,7 +97,7 @@ export default function Orders() {
       label: 'Total',
       align: 'right',
       render: (val) => (
-        <span className="font-heading text-body text-accent-primary tabular-nums">₱{Number(val).toFixed(2)}</span>
+        <span className="font-heading text-body text-accent-primary tabular-nums">{formatCurrencyRaw(val)}</span>
       ),
     },
     {
@@ -149,7 +152,7 @@ export default function Orders() {
         <div>
           <h1 className="font-heading text-h1 text-text-primary">Orders</h1>
           <p className="text-small text-text-secondary mt-1">
-            {completedOrders.length} orders • ₱{totalSales.toFixed(2)} total sales
+            {completedOrders.length} orders • {formatCurrencyRaw(totalSales)} total sales
           </p>
         </div>
       </div>
@@ -165,51 +168,57 @@ export default function Orders() {
             className="h-9 px-3 rounded-lg bg-bg-input border border-border text-small text-text-primary focus:border-border-focus focus:outline-none"
           />
         </div>
-        <select
+        <CustomSelect
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="h-9 px-3 rounded-lg bg-bg-input border border-border text-small text-text-primary focus:border-border-focus focus:outline-none"
-        >
-          <option value="">All Status</option>
-          <option value="completed">Completed</option>
-          <option value="refunded">Refunded</option>
-          <option value="held">Held</option>
-        </select>
+          onChange={setStatusFilter}
+          options={[
+            { value: '', label: 'All Status' },
+            { value: 'completed', label: 'Completed' },
+            { value: 'refunded', label: 'Refunded' },
+            { value: 'held', label: 'Held' },
+          ]}
+          size="sm"
+          className="w-36"
+        />
         {cashiers.length > 0 && (
-          <select
+          <CustomSelect
             value={cashierFilter}
-            onChange={(e) => setCashierFilter(e.target.value)}
-            className="h-9 px-3 rounded-lg bg-bg-input border border-border text-small text-text-primary focus:border-border-focus focus:outline-none"
-          >
-            <option value="">All Cashiers</option>
-            {cashiers.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+            onChange={setCashierFilter}
+            options={[
+              { value: '', label: 'All Cashiers' },
+              ...cashiers.map((c) => ({ value: String(c.id), label: c.name })),
+            ]}
+            size="sm"
+            className="w-40"
+          />
         )}
         {customers.length > 0 && (
-          <select
+          <CustomSelect
             value={customerFilter}
-            onChange={(e) => setCustomerFilter(e.target.value)}
-            className="h-9 px-3 rounded-lg bg-bg-input border border-border text-small text-text-primary focus:border-border-focus focus:outline-none"
-          >
-            <option value="">All Customers</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+            onChange={setCustomerFilter}
+            options={[
+              { value: '', label: 'All Customers' },
+              ...customers.map((c) => ({ value: String(c.id), label: c.name })),
+            ]}
+            size="sm"
+            className="w-40"
+          />
         )}
       </div>
 
       {/* Table */}
       <div className="flex-1 overflow-hidden">
-        <Table
-          columns={columns}
-          data={orders}
-          emptyIcon={<ClipboardList size={48} />}
-          emptyMessage="No orders found"
-          onRowClick={handleViewOrder}
-        />
+        {loading ? (
+          <SkeletonTable rows={6} cols={7} />
+        ) : (
+          <Table
+            columns={columns}
+            data={orders}
+            emptyIcon={<ClipboardList size={48} />}
+            emptyMessage="No orders found"
+            onRowClick={handleViewOrder}
+          />
+        )}
       </div>
 
       {/* Order Detail Modal */}
@@ -239,43 +248,77 @@ export default function Orders() {
               )}
             </div>
 
-            {/* Items */}
+            {/* Customer / Cashier info */}
+            <div className="flex items-center gap-4 text-small">
+              {selectedOrder.cashier_name && (
+                <span className="text-text-secondary">Cashier: <span className="text-text-primary font-medium">{selectedOrder.cashier_name}</span></span>
+              )}
+              {selectedOrder.customer_name && (
+                <span className="text-text-secondary">Customer: <span className="text-text-primary font-medium">{selectedOrder.customer_name}</span></span>
+              )}
+            </div>
+
+            {/* Items — detailed table */}
             <div>
-              <h3 className="text-small font-semibold text-text-secondary mb-2">Items</h3>
-              <div className="space-y-1.5">
+              <h3 className="text-small font-semibold text-text-secondary mb-2">
+                Items ({selectedOrder.items?.length || 0})
+              </h3>
+              {/* Header */}
+              <div className="grid grid-cols-12 gap-2 px-3 py-1.5 text-tiny text-text-muted uppercase tracking-wider">
+                <span className="col-span-5">Product</span>
+                <span className="col-span-2 text-right">Price</span>
+                <span className="col-span-1 text-center">Qty</span>
+                <span className="col-span-2 text-right">Discount</span>
+                <span className="col-span-2 text-right">Total</span>
+              </div>
+              <div className="space-y-1">
                 {selectedOrder.items?.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between py-2 px-3 rounded-lg bg-bg-tertiary">
-                    <div>
-                      <span className="text-body text-text-primary">{item.name}</span>
-                      <span className="text-small text-text-muted ml-2">×{item.quantity}</span>
-                    </div>
-                    <span className="text-body font-semibold text-text-primary tabular-nums">₱{Number(item.total).toFixed(2)}</span>
+                  <div key={i} className="grid grid-cols-12 gap-2 items-center py-2.5 px-3 rounded-lg bg-bg-tertiary">
+                    <span className="col-span-5 text-body text-text-primary font-medium line-clamp-2">{item.name}</span>
+                    <span className="col-span-2 text-body text-text-secondary tabular-nums text-right">{formatCurrencyRaw(item.price)}</span>
+                    <span className="col-span-1 text-body text-text-primary text-center font-semibold">{item.quantity}</span>
+                    <span className="col-span-2 text-body tabular-nums text-right">
+                      {item.discount > 0 ? (
+                        <span className="text-accent-primary">-{formatCurrencyRaw(item.discount)}</span>
+                      ) : (
+                        <span className="text-text-muted">—</span>
+                      )}
+                    </span>
+                    <span className="col-span-2 text-body font-semibold text-text-primary tabular-nums text-right">{formatCurrencyRaw(item.total)}</span>
                   </div>
                 ))}
               </div>
             </div>
 
+            {/* Order Notes */}
+            {selectedOrder.notes && (
+              <div className="px-3 py-2 rounded-lg bg-bg-tertiary border border-border">
+                <p className="text-tiny text-text-muted uppercase tracking-wider mb-1">Notes</p>
+                <p className="text-small text-text-primary">{selectedOrder.notes}</p>
+              </div>
+            )}
+
             {/* Totals */}
             <div className="border-t border-border pt-3 space-y-1.5">
               <div className="flex justify-between text-body">
                 <span className="text-text-secondary">Subtotal</span>
-                <span className="text-text-primary tabular-nums">₱{Number(selectedOrder.subtotal).toFixed(2)}</span>
+                <span className="text-text-primary tabular-nums">{formatCurrencyRaw(selectedOrder.subtotal)}</span>
               </div>
               {selectedOrder.discount_amount > 0 && (
                 <div className="flex justify-between text-body">
                   <span className="text-text-secondary">Discount</span>
-                  <span className="text-accent-primary tabular-nums">-₱{Number(selectedOrder.discount_amount).toFixed(2)}</span>
+                  <span className="text-accent-primary tabular-nums">-{formatCurrencyRaw(selectedOrder.discount_amount)}</span>
                 </div>
               )}
               {selectedOrder.tip_amount > 0 && (
                 <div className="flex justify-between text-body">
                   <span className="text-text-secondary">Tip</span>
-                  <span className="text-text-primary tabular-nums">+₱{Number(selectedOrder.tip_amount).toFixed(2)}</span>
+                  <span className="text-text-primary tabular-nums">+{formatCurrencyRaw(selectedOrder.tip_amount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-body font-semibold border-t border-border pt-2">
                 <span className="text-text-primary">Total</span>
-                <span className="font-heading text-h3 text-accent-primary tabular-nums">₱{Number(selectedOrder.total).toFixed(2)}</span>
+                <span className="font-heading text-h3 text-accent-primary tabular-nums">{formatCurrencyRaw(selectedOrder.total)}</span>
               </div>
             </div>
 
@@ -286,7 +329,7 @@ export default function Orders() {
                 {selectedOrder.payments.map((p, i) => (
                   <div key={i} className="flex items-center justify-between py-2 px-3 rounded-lg bg-bg-tertiary mb-1">
                     <span className="text-body text-text-primary capitalize">{p.method}</span>
-                    <span className="text-body text-text-primary tabular-nums">₱{Number(p.amount).toFixed(2)}</span>
+                    <span className="text-body text-text-primary tabular-nums">{formatCurrencyRaw(p.amount)}</span>
                   </div>
                 ))}
               </div>
@@ -301,7 +344,7 @@ export default function Orders() {
         onClose={() => setRefundTarget(null)}
         onConfirm={handleRefund}
         title="Refund Order"
-        message={`Refund order ${refundTarget?.order_number} for ₱${Number(refundTarget?.total || 0).toFixed(2)}? Stock will be restored.`}
+        message={`Refund order ${refundTarget?.order_number} for ${formatCurrencyRaw(refundTarget?.total)}? Stock will be restored.`}
         confirmText="Refund"
         variant="danger"
       />

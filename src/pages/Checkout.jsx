@@ -74,8 +74,8 @@ export default function Checkout() {
         <ProductGrid />
       </div>
 
-      {/* Cart Panel — fixed 380px */}
-      <div className="w-[380px] shrink-0">
+      {/* Cart Panel — responsive width */}
+      <div className="w-[320px] xl:w-[380px] shrink-0">
         <Cart onPay={handlePay} onSplitPay={handleSplitPay} />
       </div>
 

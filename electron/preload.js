@@ -85,8 +85,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ─── Gift Cards ───
   getGiftCards:   ()     => ipcRenderer.invoke('giftcards:getAll'),
   createGiftCard: (data) => ipcRenderer.invoke('giftcards:create', data),
+  updateGiftCard: (id, data) => ipcRenderer.invoke('giftcards:update', id, data),
+  deleteGiftCard: (id) => ipcRenderer.invoke('giftcards:delete', id),
   redeemGiftCard: (code, amount) => ipcRenderer.invoke('giftcards:redeem', code, amount),
+
+  // ─── Ingredients ───
+  getIngredients:    () => ipcRenderer.invoke('ingredients:getAll'),
+  createIngredient:  (data) => ipcRenderer.invoke('ingredients:create', data),
+  updateIngredient:  (id, data) => ipcRenderer.invoke('ingredients:update', id, data),
+  deleteIngredient:  (id) => ipcRenderer.invoke('ingredients:delete', id),
+  adjustIngredient:  (id, data) => ipcRenderer.invoke('ingredients:adjust', id, data),
 
   // ─── Image Upload ───
   uploadImage: () => ipcRenderer.invoke('dialog:uploadImage'),
+
+  // ─── Print ───
+  printReceipt: (html) => ipcRenderer.invoke('print:receipt', html),
 });

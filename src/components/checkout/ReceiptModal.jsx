@@ -2,6 +2,7 @@ import { Printer, X } from 'lucide-react';
 import Modal from '../shared/Modal';
 import { useSettingsStore } from '../../store/settingsStore';
 import { cn } from '../../lib/cn';
+import { formatCurrencyRaw } from '../../lib/formatCurrency';
 
 /**
  * ReceiptModal — receipt preview and print.
@@ -14,13 +15,11 @@ export default function ReceiptModal({ isOpen, onClose, orderData, cashReceived,
   const storeName = settings?.store_name || 'FLEXPOS';
   const receiptFooter = settings?.receipt_footer || 'Thank you! Please come again.';
 
-  const handlePrint = () => {
-    // Create a print-friendly window
+  const handlePrint = async () => {
     const printContent = document.getElementById('receipt-content');
     if (!printContent) return;
 
-    const printWindow = window.open('', '_blank', 'width=300,height=600');
-    printWindow.document.write(`
+    const html = `
       <html>
         <head>
           <title>Receipt #${orderData.orderNumber}</title>
@@ -38,11 +37,19 @@ export default function ReceiptModal({ isOpen, onClose, orderData, cashReceived,
         </head>
         <body>
           ${printContent.innerHTML}
-          <script>window.onload = () => { window.print(); window.close(); }</script>
         </body>
       </html>
-    `);
-    printWindow.document.close();
+    `;
+
+    // Use Electron's native print (works in packaged app)
+    if (window.electronAPI?.printReceipt) {
+      await window.electronAPI.printReceipt(html);
+    } else {
+      // Fallback for dev/browser mode
+      const printWindow = window.open('', '_blank', 'width=300,height=600');
+      printWindow.document.write(html + '<script>window.onload = () => { window.print(); window.close(); }<\/script>');
+      printWindow.document.close();
+    }
   };
 
   const now = new Date();
@@ -94,13 +101,13 @@ export default function ReceiptModal({ isOpen, onClose, orderData, cashReceived,
                 <div className="flex justify-between">
                   <span className="flex-1 truncate">{item.name}</span>
                   <span className="tabular-nums ml-2">
-                    ₱{((item.price * item.quantity) - (item.discount || 0)).toFixed(2)}
+                    {formatCurrencyRaw((item.price * item.quantity) - (item.discount || 0))}
                   </span>
                 </div>
                 {(item.quantity > 1 || item.discount > 0) && (
                   <div className="text-[10px] text-gray-500 pl-2">
-                    {item.quantity} × ₱{Number(item.price).toFixed(2)}
-                    {item.discount > 0 && ` (-₱${Number(item.discount).toFixed(2)})`}
+                    {item.quantity} × {formatCurrencyRaw(item.price)}
+                    {item.discount > 0 && ` (-${formatCurrencyRaw(item.discount)})`}
                   </div>
                 )}
               </div>
@@ -116,23 +123,23 @@ export default function ReceiptModal({ isOpen, onClose, orderData, cashReceived,
               <>
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
-                  <span className="tabular-nums">₱{Number(orderData.subtotal || 0).toFixed(2)}</span>
+                  <span className="tabular-nums">{formatCurrencyRaw(orderData.subtotal || 0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Discount:</span>
-                  <span className="tabular-nums">-₱{Number(orderData.discountAmount).toFixed(2)}</span>
+                  <span className="tabular-nums">-{formatCurrencyRaw(orderData.discountAmount)}</span>
                 </div>
               </>
             )}
             {orderData.tipAmount > 0 && (
               <div className="flex justify-between">
                 <span>Tip:</span>
-                <span className="tabular-nums">₱{Number(orderData.tipAmount).toFixed(2)}</span>
+                <span className="tabular-nums">{formatCurrencyRaw(orderData.tipAmount)}</span>
               </div>
             )}
             <div className="flex justify-between text-[14px] font-bold pt-1">
               <span>TOTAL:</span>
-              <span className="tabular-nums">₱{Number(orderData.total).toFixed(2)}</span>
+              <span className="tabular-nums">{formatCurrencyRaw(orderData.total)}</span>
             </div>
           </div>
 
@@ -143,11 +150,11 @@ export default function ReceiptModal({ isOpen, onClose, orderData, cashReceived,
           <div className="space-y-0.5">
             <div className="flex justify-between">
               <span>Cash:</span>
-              <span className="tabular-nums">₱{Number(cashReceived).toFixed(2)}</span>
+              <span className="tabular-nums">{formatCurrencyRaw(cashReceived)}</span>
             </div>
             <div className="flex justify-between font-bold">
               <span>Change:</span>
-              <span className="tabular-nums">₱{Number(change).toFixed(2)}</span>
+              <span className="tabular-nums">{formatCurrencyRaw(change)}</span>
             </div>
           </div>
 

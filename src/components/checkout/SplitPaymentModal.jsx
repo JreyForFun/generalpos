@@ -1,14 +1,18 @@
 import { useState } from 'react';
-import { Plus, Trash2, ArrowRight, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, ArrowRight, AlertCircle, Wallet } from 'lucide-react';
 import Modal from '../shared/Modal';
+import CustomSelect from '../shared/CustomSelect';
 import { useCheckoutStore } from '../../store/checkoutStore';
 import { useToast } from '../shared/Toast';
 import { cn } from '../../lib/cn';
+import { formatCurrencyRaw } from '../../lib/formatCurrency';
+import CustomerSelect from './CustomerSelect';
 
 /**
  * SplitPaymentModal — split a bill across multiple payers.
  * Each payer has a name, method (cash/ewallet), and amount.
  * Validates that sum of all payer amounts equals the order total.
+ * If any payer uses eWallet, a customer must be selected.
  */
 const METHODS = [
   { id: 'cash', label: 'Cash' },
@@ -33,6 +37,8 @@ export default function SplitPaymentModal({ isOpen, onClose, onComplete }) {
   const payerTotal = payers.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
   const remaining = Number((total - payerTotal).toFixed(2));
   const isBalanced = Math.abs(remaining) < 0.01;
+  const hasEwalletPayer = payers.some((p) => p.method === 'ewallet');
+  const needsCustomer = hasEwalletPayer && !customer;
 
   const handleAddPayer = () => {
     setPayers((prev) => [
@@ -54,7 +60,6 @@ export default function SplitPaymentModal({ isOpen, onClose, onComplete }) {
 
   const handleSplitEvenly = () => {
     const perPayer = Number((total / payers.length).toFixed(2));
-    // Last payer gets remainder to avoid rounding issues
     setPayers((prev) =>
       prev.map((p, i) => ({
         ...p,
@@ -71,7 +76,6 @@ export default function SplitPaymentModal({ isOpen, onClose, onComplete }) {
       return;
     }
 
-    // Validate all payers have amounts
     for (const payer of payers) {
       const amt = parseFloat(payer.amount);
       if (!amt || amt <= 0) {
@@ -82,6 +86,29 @@ export default function SplitPaymentModal({ isOpen, onClose, onComplete }) {
 
     setProcessing(true);
     try {
+      const ewalletPayers = payers.filter((p) => p.method === 'ewallet');
+      if (ewalletPayers.length > 0 && !customer?.id) {
+        toast.error('A customer must be selected to use eWallet payment');
+        setProcessing(false);
+        return;
+      }
+
+      const totalEwalletAmount = ewalletPayers.reduce((s, p) => s + parseFloat(p.amount), 0);
+      if (totalEwalletAmount > 0 && customer?.ewallet < totalEwalletAmount) {
+        toast.error(`Insufficient eWallet balance (${formatCurrencyRaw(customer.ewallet || 0)} available)`);
+        setProcessing(false);
+        return;
+      }
+
+      if (totalEwalletAmount > 0) {
+        const deductResult = await window.electronAPI.ewalletDeduct(customer.id, totalEwalletAmount);
+        if (!deductResult.success) {
+          toast.error(deductResult.error || 'eWallet deduction failed');
+          setProcessing(false);
+          return;
+        }
+      }
+
       const orderData = {
         items: items.map((item) => ({
           productId: item.productId,
@@ -138,16 +165,32 @@ export default function SplitPaymentModal({ isOpen, onClose, onComplete }) {
         <div className="text-center py-3 rounded-xl bg-bg-primary border border-border">
           <p className="text-small text-text-muted uppercase tracking-wider mb-1">Total to Split</p>
           <p className="font-heading text-display text-accent-primary tabular-nums">
-            ₱{total.toFixed(2)}
+            {formatCurrencyRaw(total)}
           </p>
         </div>
+
+        {/* Customer Select — shown when any payer uses eWallet */}
+        {hasEwalletPayer && (
+          <div className="rounded-lg border border-accent-secondary/30 bg-accent-secondary/5 p-3 space-y-2">
+            <div className="flex items-center gap-2 text-small text-text-secondary">
+              <Wallet size={14} className="text-accent-secondary" />
+              <span className="font-medium">eWallet requires a linked customer</span>
+              {customer && (
+                <span className="ml-auto text-accent-primary font-semibold tabular-nums">
+                  Balance: {formatCurrencyRaw(customer.ewallet || 0)}
+                </span>
+              )}
+            </div>
+            {!customer && <CustomerSelect />}
+          </div>
+        )}
 
         {/* Split Evenly Button */}
         <button
           onClick={handleSplitEvenly}
           className="w-full h-9 rounded-lg border border-border text-small text-text-secondary font-medium hover:bg-bg-hover transition-colors"
         >
-          Split Evenly ({payers.length} payers × ₱{(total / payers.length).toFixed(2)})
+          Split Evenly ({payers.length} payers × {formatCurrencyRaw(total / payers.length)})
         </button>
 
         {/* Payers List */}
@@ -167,15 +210,13 @@ export default function SplitPaymentModal({ isOpen, onClose, onComplete }) {
               />
 
               {/* Method */}
-              <select
+              <CustomSelect
                 value={payer.method}
-                onChange={(e) => handleUpdatePayer(i, 'method', e.target.value)}
-                className="h-9 px-2 rounded bg-bg-input border border-border text-small text-text-primary focus:border-border-focus focus:outline-none"
-              >
-                {METHODS.map((m) => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
-              </select>
+                onChange={(v) => handleUpdatePayer(i, 'method', v)}
+                options={METHODS.map((m) => ({ value: m.id, label: m.label }))}
+                size="sm"
+                className="w-28"
+              />
 
               {/* Amount */}
               <div className="flex-1">
@@ -232,22 +273,22 @@ export default function SplitPaymentModal({ isOpen, onClose, onComplete }) {
             'font-heading text-h3 tabular-nums',
             isBalanced ? 'text-accent-primary' : 'text-accent-danger'
           )}>
-            {isBalanced ? '₱0.00' : `₱${Math.abs(remaining).toFixed(2)}`}
+            {isBalanced ? formatCurrencyRaw(0) : formatCurrencyRaw(Math.abs(remaining))}
           </span>
         </div>
 
         {/* Complete Button */}
         <button
           onClick={handleCompleteSplit}
-          disabled={!isBalanced || processing}
+          disabled={!isBalanced || processing || needsCustomer}
           className={cn(
             'w-full h-14 rounded-xl font-heading text-h3 font-bold flex items-center justify-center gap-2 transition-all duration-150',
-            isBalanced && !processing
+            isBalanced && !processing && !needsCustomer
               ? 'bg-accent-primary text-text-inverse shadow-glow hover:bg-accent-primary-hover active:scale-[0.98]'
               : 'bg-bg-hover text-text-muted cursor-not-allowed'
           )}
         >
-          {processing ? 'Processing...' : (
+          {processing ? 'Processing...' : needsCustomer ? 'Select a customer first' : (
             <>Complete Split Payment <ArrowRight size={20} /></>
           )}
         </button>

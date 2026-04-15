@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, X, Barcode, Upload, Image as ImageIcon } from 'lucide-react';
 import Modal from '../shared/Modal';
+import CustomSelect from '../shared/CustomSelect';
 import { cn } from '../../lib/cn';
 
 /**
@@ -182,16 +183,15 @@ export default function ProductForm({ product, categories, onSave, onClose }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-small text-text-secondary mb-1.5 block">Category</label>
-              <select
-                value={form.category_id}
-                onChange={(e) => handleChange('category_id', e.target.value)}
-                className="w-full h-11 px-3 rounded-lg bg-bg-input border border-border text-body text-text-primary focus:border-border-focus focus:outline-none"
-              >
-                <option value="">None</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <CustomSelect
+                value={form.category_id ? String(form.category_id) : ''}
+                onChange={(v) => handleChange('category_id', v)}
+                options={[
+                  { value: '', label: 'None' },
+                  ...categories.map((c) => ({ value: String(c.id), label: c.name })),
+                ]}
+                placeholder="Select category"
+              />
             </div>
             <div>
               <label className="text-small text-text-secondary mb-1.5 block">Price (₱) *</label>

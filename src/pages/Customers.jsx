@@ -4,10 +4,12 @@ import Table from '../components/shared/Table';
 import SearchBar from '../components/shared/SearchBar';
 import Modal from '../components/shared/Modal';
 import ConfirmModal from '../components/shared/ConfirmModal';
+import { SkeletonTable } from '../components/shared/Skeleton';
 import { useToast } from '../components/shared/Toast';
 import CustomerForm from '../components/customers/CustomerForm';
 import CustomerProfile from '../components/customers/CustomerProfile';
 import { cn } from '../lib/cn';
+import { formatCurrencyRaw } from '../lib/formatCurrency';
 
 /**
  * Customers page — customer list, add/edit, profile view.
@@ -122,7 +124,7 @@ export default function Customers() {
       render: (val) => (
         <span className="flex items-center gap-1 font-heading text-body tabular-nums text-accent-primary">
           <Wallet size={13} />
-          ₱{Number(val || 0).toFixed(2)}
+          {formatCurrencyRaw(val)}
         </span>
       ),
     },
@@ -134,7 +136,7 @@ export default function Customers() {
         const expired = row.discount_expiry && new Date(row.discount_expiry) < new Date();
         return (
           <span className={cn('text-small font-semibold', expired ? 'text-text-muted line-through' : 'text-accent-secondary')}>
-            {val === 'percent' ? `${row.discount_value}%` : `₱${row.discount_value}`}
+            {val === 'percent' ? `${row.discount_value}%` : formatCurrencyRaw(row.discount_value)}
             {expired && <span className="text-tiny ml-1 no-underline">(expired)</span>}
           </span>
         );
@@ -198,13 +200,17 @@ export default function Customers() {
 
       {/* Table */}
       <div className="flex-1 overflow-hidden">
-        <Table
-          columns={columns}
-          data={customers}
-          emptyIcon={<Users size={48} />}
-          emptyMessage={search ? 'No customers match your search' : 'No customers yet'}
-          onRowClick={handleViewProfile}
-        />
+        {loading ? (
+          <SkeletonTable rows={6} cols={5} />
+        ) : (
+          <Table
+            columns={columns}
+            data={customers}
+            emptyIcon={<Users size={48} />}
+            emptyMessage={search ? 'No customers match your search' : 'No customers yet'}
+            onRowClick={handleViewProfile}
+          />
+        )}
       </div>
 
       {/* Customer Form Modal */}

@@ -99,15 +99,50 @@ module.exports = function registerSettingsHandlers(db) {
       const card = db.prepare('SELECT * FROM gift_cards WHERE code = ? AND is_active = 1').get(code);
       if (!card) return { success: false, error: 'Gift card not found or inactive' };
       if (card.expiry_date && new Date(card.expiry_date) < new Date()) return { success: false, error: 'Gift card expired' };
-      if (card.balance < amount) return { success: false, error: 'Insufficient gift card balance' };
+      if (card.balance <= 0) return { success: false, error: 'Gift card has no remaining balance' };
 
-      db.prepare('UPDATE gift_cards SET balance = balance - ? WHERE id = ?').run(amount, card.id);
-      if (card.balance - amount <= 0) db.prepare('UPDATE gift_cards SET is_active = 0 WHERE id = ?').run(card.id);
+      // Allow partial: deduct min(balance, requested amount)
+      const applied = Math.min(card.balance, amount);
+      const newBalance = Number((card.balance - applied).toFixed(2));
 
-      return { success: true, data: { remainingBalance: card.balance - amount } };
+      db.prepare('UPDATE gift_cards SET balance = ? WHERE id = ?').run(newBalance, card.id);
+      if (newBalance <= 0) db.prepare('UPDATE gift_cards SET is_active = 0 WHERE id = ?').run(card.id);
+
+      return { success: true, data: { applied, remainingBalance: newBalance } };
     } catch (err) {
       log.error('giftcards:redeem failed', err);
       return { success: false, error: 'Failed to redeem gift card' };
+    }
+  });
+
+  ipcMain.handle('giftcards:update', (_event, id, data) => {
+    try {
+      const { authorized, error } = requireRole(['admin', 'manager']);
+      if (!authorized) return { success: false, error };
+
+      db.prepare(`
+        UPDATE gift_cards SET balance = ?, expiry_date = ?, max_uses = ?, is_active = ? WHERE id = ?
+      `).run(data.balance, data.expiry_date || null, data.max_uses || 1, data.is_active ? 1 : 0, id);
+
+      writeAudit(db, 'gift_card_update', 'gift_card', id);
+      return { success: true };
+    } catch (err) {
+      log.error('giftcards:update failed', err);
+      return { success: false, error: 'Failed to update gift card' };
+    }
+  });
+
+  ipcMain.handle('giftcards:delete', (_event, id) => {
+    try {
+      const { authorized, error } = requireRole(['admin', 'manager']);
+      if (!authorized) return { success: false, error };
+
+      db.prepare('DELETE FROM gift_cards WHERE id = ?').run(id);
+      writeAudit(db, 'gift_card_delete', 'gift_card', id);
+      return { success: true };
+    } catch (err) {
+      log.error('giftcards:delete failed', err);
+      return { success: false, error: 'Failed to delete gift card' };
     }
   });
 };

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { UserPlus, X, Star, Wallet, Search } from 'lucide-react';
 import { useCheckoutStore } from '../../store/checkoutStore';
 import { cn } from '../../lib/cn';
+import { formatCurrencyRaw, formatCurrencyShort } from '../../lib/formatCurrency';
 
 /**
  * CustomerSelect — inline customer search/select for the Cart.
@@ -61,11 +62,11 @@ export default function CustomerSelect() {
             </span>
             <span className="flex items-center gap-1 text-tiny text-accent-primary">
               <Wallet size={10} />
-              ₱{Number(customer.ewallet || 0).toFixed(2)}
+              {formatCurrencyRaw(customer.ewallet || 0)}
             </span>
             {discountActive && (
               <span className="text-tiny font-semibold text-accent-secondary">
-                {customer.discount_type === 'percent' ? `${customer.discount_value}% off` : `₱${customer.discount_value} off`}
+                {customer.discount_type === 'percent' ? `${customer.discount_value}% off` : `${formatCurrencyRaw(customer.discount_value)} off`}
               </span>
             )}
           </div>
@@ -122,7 +123,7 @@ export default function CustomerSelect() {
                     <Star size={9} className="text-accent-warning" />
                     {Number(c.points || 0).toLocaleString()}
                   </span>
-                  <span className="text-accent-primary">₱{Number(c.ewallet || 0).toFixed(0)}</span>
+                  <span className="text-accent-primary">{formatCurrencyShort(c.ewallet || 0)}</span>
                 </div>
               </button>
             ))}
