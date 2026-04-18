@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Modal from '../shared/Modal';
+import CustomSelect from '../shared/CustomSelect';
 import { cn } from '../../lib/cn';
 
 /**
@@ -81,15 +82,16 @@ export default function CustomerForm({ customer, onSave, onClose }) {
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-tiny text-text-muted mb-1 block">Type</label>
-              <select
+              <CustomSelect
                 value={form.discount_type}
-                onChange={(e) => handleChange('discount_type', e.target.value)}
-                className="w-full h-10 px-2 rounded-lg bg-bg-input border border-border text-small text-text-primary focus:border-border-focus focus:outline-none"
-              >
-                <option value="">None</option>
-                <option value="percent">Percentage (%)</option>
-                <option value="fixed">Fixed (₱)</option>
-              </select>
+                onChange={(v) => handleChange('discount_type', v)}
+                options={[
+                  { value: '', label: 'None' },
+                  { value: 'percent', label: 'Percentage (%)' },
+                  { value: 'fixed', label: 'Fixed (₱)' },
+                ]}
+                size="sm"
+              />
             </div>
             <div>
               <label className="text-tiny text-text-muted mb-1 block">Value</label>

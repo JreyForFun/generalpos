@@ -19,6 +19,7 @@ export const IPC = {
   PRODUCTS_CREATE: 'products:create',
   PRODUCTS_UPDATE: 'products:update',
   PRODUCTS_DELETE: 'products:delete',
+  PRODUCTS_FIND_BY_BARCODE: 'products:findByBarcode',
 
   // Categories
   CATEGORIES_GET_ALL: 'categories:getAll',
@@ -38,6 +39,9 @@ export const IPC = {
   CUSTOMERS_CREATE: 'customers:create',
   CUSTOMERS_UPDATE: 'customers:update',
   CUSTOMERS_DELETE: 'customers:delete',
+  CUSTOMERS_REDEEM_POINTS: 'customers:redeemPoints',
+  CUSTOMERS_EWALLET_DEDUCT: 'customers:ewalletDeduct',
+  CUSTOMERS_EWALLET_ADD: 'customers:ewalletAdd',
 
   // Cashiers
   CASHIERS_GET_ALL: 'cashiers:getAll',
@@ -53,6 +57,8 @@ export const IPC = {
   REPORTS_DAILY_SALES: 'reports:dailySales',
   REPORTS_SALES_BY_METHOD: 'reports:salesByMethod',
   REPORTS_BEST_SELLERS: 'reports:bestSellers',
+  REPORTS_WEEKLY_SALES: 'reports:weeklySales',
+  REPORTS_CASHIER_PERFORMANCE: 'reports:cashierPerformance',
   REPORTS_EXPORT_PDF: 'reports:exportPDF',
 
   // Cash Flows
@@ -72,4 +78,10 @@ export const IPC = {
   GIFTCARDS_GET_ALL: 'giftcards:getAll',
   GIFTCARDS_CREATE: 'giftcards:create',
   GIFTCARDS_REDEEM: 'giftcards:redeem',
+
+  // Backup
+  BACKUP_EXPORT: 'backup:export',
+
+  // Image Upload
+  DIALOG_UPLOAD_IMAGE: 'dialog:uploadImage',
 };

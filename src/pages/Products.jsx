@@ -4,9 +4,12 @@ import Table from '../components/shared/Table';
 import SearchBar from '../components/shared/SearchBar';
 import Modal from '../components/shared/Modal';
 import ConfirmModal from '../components/shared/ConfirmModal';
+import CustomSelect from '../components/shared/CustomSelect';
 import { useToast } from '../components/shared/Toast';
 import ProductForm from '../components/products/ProductForm';
 import { cn } from '../lib/cn';
+import { SkeletonTable } from '../components/shared/Skeleton';
+import { formatCurrencyRaw } from '../lib/formatCurrency';
 
 /**
  * Products page — admin product management.
@@ -128,7 +131,7 @@ export default function Products() {
       label: 'Price',
       render: (val) => (
         <span className="font-heading text-body text-accent-primary tabular-nums">
-          ₱{Number(val).toFixed(2)}
+          {formatCurrencyRaw(val)}
         </span>
       ),
     },
@@ -217,27 +220,30 @@ export default function Products() {
           placeholder="Search products..."
           className="flex-1"
         />
-        <select
+        <CustomSelect
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="h-11 px-4 rounded-xl bg-bg-input border border-border text-body text-text-primary focus:border-border-focus focus:outline-none"
-        >
-          <option value="all">All Categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
+          onChange={setCategoryFilter}
+          options={[
+            { value: 'all', label: 'All Categories' },
+            ...categories.map((c) => ({ value: String(c.id), label: c.name })),
+          ]}
+          className="w-44"
+        />
       </div>
 
       {/* Table */}
       <div className="flex-1 overflow-hidden">
-        <Table
-          columns={columns}
-          data={filteredProducts}
-          emptyIcon={<Package size={48} />}
-          emptyMessage="No products found"
-          onRowClick={handleEdit}
-        />
+        {loading ? (
+          <SkeletonTable rows={6} cols={5} />
+        ) : (
+          <Table
+            columns={columns}
+            data={filteredProducts}
+            emptyIcon={<Package size={48} />}
+            emptyMessage="No products found"
+            onRowClick={handleEdit}
+          />
+        )}
       </div>
 
       {/* Product Form Modal */}

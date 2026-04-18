@@ -86,11 +86,11 @@ app.whenReady().then(() => {
   ipcMain.on('window:close', () => mainWindow?.close());
   ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized());
 
-  // Image upload handler — copies image to local storage
+  // Image upload handler — converts image to base64 data URI
   ipcMain.handle('dialog:uploadImage', async () => {
     try {
       const result = await dialog.showOpenDialog(mainWindow, {
-        title: 'Select Product Image',
+        title: 'Select Image',
         filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }],
         properties: ['openFile'],
       });
@@ -101,20 +101,45 @@ app.whenReady().then(() => {
 
       const fs = require('fs');
       const sourcePath = result.filePaths[0];
-      const imagesDir = path.join(app.getPath('userData'), 'images');
-      if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
+      const ext = path.extname(sourcePath).toLowerCase().replace('.', '');
+      const mimeMap = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+      const mime = mimeMap[ext] || 'image/png';
 
-      const ext = path.extname(sourcePath);
-      const filename = `product-${Date.now()}${ext}`;
-      const destPath = path.join(imagesDir, filename);
+      const buffer = fs.readFileSync(sourcePath);
+      const base64 = buffer.toString('base64');
+      const dataUri = `data:${mime};base64,${base64}`;
 
-      fs.copyFileSync(sourcePath, destPath);
-      log.info(`Image uploaded: ${destPath}`);
+      log.info(`Image uploaded as base64 (${Math.round(buffer.length / 1024)}KB)`);
 
-      return { success: true, data: { path: destPath } };
+      return { success: true, data: { path: dataUri } };
     } catch (err) {
       log.error('dialog:uploadImage failed', err);
       return { success: false, error: 'Failed to upload image' };
+    }
+  });
+
+  // Print receipt via hidden BrowserWindow (works in packaged app)
+  ipcMain.handle('print:receipt', async (_event, html) => {
+    try {
+      const printWin = new BrowserWindow({
+        show: false,
+        width: 350,
+        height: 700,
+        webPreferences: { contextIsolation: true, nodeIntegration: false },
+      });
+
+      await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+      await new Promise((r) => setTimeout(r, 300));
+
+      printWin.webContents.print({ silent: false, printBackground: true }, (success, reason) => {
+        if (!success) log.warn('Print failed or cancelled:', reason);
+        printWin.close();
+      });
+
+      return { success: true };
+    } catch (err) {
+      log.error('print:receipt failed', err);
+      return { success: false, error: 'Failed to print receipt' };
     }
   });
 

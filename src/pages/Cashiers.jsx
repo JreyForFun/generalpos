@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { UserCog, Plus, Edit2, Key, Shield, ShieldCheck, ShieldX } from 'lucide-react';
 import Table from '../components/shared/Table';
 import Modal from '../components/shared/Modal';
+import ConfirmModal from '../components/shared/ConfirmModal';
+import CustomSelect from '../components/shared/CustomSelect';
+import { SkeletonTable } from '../components/shared/Skeleton';
 import { useToast } from '../components/shared/Toast';
 import { cn } from '../lib/cn';
 
@@ -16,6 +19,7 @@ export default function Cashiers() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [showPinChange, setShowPinChange] = useState(null);
+  const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [newPin, setNewPin] = useState('');
 
   // Form state
@@ -82,11 +86,27 @@ export default function Cashiers() {
   };
 
   const handleToggleActive = async (cashier) => {
-    const result = await window.electronAPI.updateCashier(cashier.id, {
-      is_active: !cashier.is_active,
-    });
+    // If currently active, require confirmation for deactivation
+    if (cashier.is_active) {
+      setDeactivateTarget(cashier);
+      return;
+    }
+    // Activation doesn't need confirmation
+    const result = await window.electronAPI.updateCashier(cashier.id, { is_active: 1 });
     if (result.success) {
-      toast.success(cashier.is_active ? 'Cashier deactivated' : 'Cashier activated');
+      toast.success('Cashier activated');
+      loadCashiers();
+    } else {
+      toast.error(result.error);
+    }
+  };
+
+  const confirmDeactivate = async () => {
+    if (!deactivateTarget) return;
+    const result = await window.electronAPI.updateCashier(deactivateTarget.id, { is_active: 0 });
+    if (result.success) {
+      toast.success(`${deactivateTarget.name} deactivated`);
+      setDeactivateTarget(null);
       loadCashiers();
     } else {
       toast.error(result.error);
@@ -183,7 +203,11 @@ export default function Cashiers() {
       </div>
 
       <div className="flex-1 overflow-hidden">
-        <Table columns={columns} data={cashiers} emptyIcon={<UserCog size={48} />} emptyMessage="No cashiers" />
+        {loading ? (
+          <SkeletonTable rows={4} cols={4} />
+        ) : (
+          <Table columns={columns} data={cashiers} emptyIcon={<UserCog size={48} />} emptyMessage="No cashiers" />
+        )}
       </div>
 
       {/* Add/Edit Form */}
@@ -206,12 +230,15 @@ export default function Cashiers() {
             )}
             <div>
               <label className="text-small text-text-secondary mb-1.5 block">Role</label>
-              <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                className="w-full h-11 px-3 rounded-lg bg-bg-input border border-border text-body text-text-primary focus:border-border-focus focus:outline-none">
-                <option value="cashier">Cashier</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
-              </select>
+              <CustomSelect
+                value={form.role}
+                onChange={(v) => setForm((f) => ({ ...f, role: v }))}
+                options={[
+                  { value: 'cashier', label: 'Cashier' },
+                  { value: 'manager', label: 'Manager' },
+                  { value: 'admin', label: 'Admin' },
+                ]}
+              />
             </div>
             <div className="flex gap-3 pt-2">
               <button onClick={() => setShowForm(false)} className="flex-1 h-11 rounded-lg border border-border text-text-secondary font-medium hover:bg-bg-hover transition-colors">Cancel</button>
@@ -247,6 +274,17 @@ export default function Cashiers() {
           </div>
         </Modal>
       )}
+
+      {/* Deactivate Confirmation */}
+      <ConfirmModal
+        isOpen={!!deactivateTarget}
+        onClose={() => setDeactivateTarget(null)}
+        onConfirm={confirmDeactivate}
+        title="Deactivate Cashier"
+        message={`Are you sure you want to deactivate ${deactivateTarget?.name}? They will not be able to log in until reactivated.`}
+        confirmLabel="Deactivate"
+        variant="danger"
+      />
     </div>
   );
 }

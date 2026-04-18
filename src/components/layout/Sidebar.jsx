@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import {
   ShoppingCart, Package, ClipboardList, Users, BarChart3,
-  Boxes, UserCog, Settings, LogOut, CreditCard
+  Boxes, UserCog, Settings, LogOut, CreditCard, BookOpen
 } from 'lucide-react';
 import { useViewStore } from '../../store/viewStore';
 import { useSessionStore } from '../../store/sessionStore';
 import { isAdmin } from '../../constants/roles';
+import ConfirmModal from '../shared/ConfirmModal';
 import { cn } from '../../lib/cn';
 
 const navItems = [
@@ -17,6 +19,7 @@ const navItems = [
   { id: 'reports',   icon: BarChart3,     label: 'Reports',    roles: 'admin' },
   { id: 'cashiers',  icon: UserCog,       label: 'Cashiers',   roles: 'admin' },
   { id: 'settings',  icon: Settings,      label: 'Settings',   roles: 'admin' },
+  { id: 'manual',    icon: BookOpen,      label: 'Manual',     roles: 'all' },
 ];
 
 export default function Sidebar() {
@@ -24,6 +27,7 @@ export default function Sidebar() {
   const navigate = useViewStore((s) => s.navigate);
   const session = useSessionStore((s) => s.session);
   const logout = useSessionStore((s) => s.logout);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const visibleItems = navItems.filter((item) => {
     if (item.roles === 'all') return true;
@@ -68,7 +72,7 @@ export default function Sidebar() {
             </p>
           </div>
           <button
-            onClick={logout}
+            onClick={() => setShowLogoutConfirm(true)}
             className="flex items-center justify-center w-11 h-11 rounded-lg text-text-secondary hover:bg-bg-hover hover:text-accent-danger transition-colors duration-150"
             aria-label="Logout"
           >
@@ -76,6 +80,17 @@ export default function Sidebar() {
           </button>
         </div>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={logout}
+        title="Log Out"
+        message="Are you sure you want to log out? Any unsaved cart data will be lost."
+        confirmText="Log Out"
+        variant="warning"
+      />
     </aside>
   );
 }

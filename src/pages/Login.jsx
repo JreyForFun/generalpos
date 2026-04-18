@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Lock } from 'lucide-react';
 import { useSessionStore } from '../store/sessionStore';
 import { useSettingsStore } from '../store/settingsStore';
@@ -7,12 +7,24 @@ import PinPad from '../components/shared/PinPad';
 /**
  * Login page — fullscreen PIN entry.
  * First screen shown before any other view.
+ * Shows store logo (if configured) alongside brand.
  */
 export default function Login() {
   const login = useSessionStore((s) => s.login);
   const loadSettings = useSettingsStore((s) => s.loadSettings);
   const [error, setError] = useState('');
   const [shaking, setShaking] = useState(false);
+  const [storeLogo, setStoreLogo] = useState(null);
+
+  // Load store info for logo display
+  useEffect(() => {
+    (async () => {
+      const result = await window.electronAPI.getStoreInfo?.();
+      if (result?.success && result.data?.logo_path) {
+        setStoreLogo(result.data.logo_path);
+      }
+    })();
+  }, []);
 
   const handlePinSubmit = async (pin) => {
     setError('');
@@ -35,9 +47,15 @@ export default function Login() {
       <div className="flex flex-col items-center gap-8">
         {/* Logo / Brand */}
         <div className="flex flex-col items-center gap-4">
-          <div className="w-20 h-20 rounded-2xl bg-bg-tertiary flex items-center justify-center shadow-lg">
-            <Lock size={40} className="text-accent-primary" />
-          </div>
+          {storeLogo ? (
+            <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg border border-border">
+              <img src={storeLogo} alt="Store logo" className="w-full h-full object-contain" />
+            </div>
+          ) : (
+            <div className="w-20 h-20 rounded-2xl bg-bg-tertiary flex items-center justify-center shadow-lg">
+              <Lock size={40} className="text-accent-primary" />
+            </div>
+          )}
           <div className="text-center">
             <h1 className="font-heading text-display text-text-primary tracking-wider">
               FLEX<span className="text-accent-primary">POS</span>
@@ -52,7 +70,7 @@ export default function Login() {
         </div>
 
         {/* Version */}
-        <p className="text-tiny text-text-muted">v1.0.0</p>
+        <p className="text-tiny text-text-muted">v{__APP_VERSION__}</p>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { Star, Wallet, ShoppingBag, Calendar, Plus } from 'lucide-react';
 import Modal from '../shared/Modal';
 import { useToast } from '../shared/Toast';
 import { cn } from '../../lib/cn';
+import { formatCurrencyRaw } from '../../lib/formatCurrency';
 
 /**
  * CustomerProfile — modal showing customer details, purchase history,
@@ -20,7 +21,7 @@ export default function CustomerProfile({ customer, onClose, onRefresh }) {
     setProcessing(true);
     const result = await window.electronAPI.ewalletTopup(customer.id, amount);
     if (result.success) {
-      toast.success(`₱${amount.toFixed(2)} added to eWallet`);
+      toast.success(`${formatCurrencyRaw(amount)} added to eWallet`);
       setTopupAmount('');
       onRefresh?.();
       // Update local state
@@ -36,7 +37,7 @@ export default function CustomerProfile({ customer, onClose, onRefresh }) {
     const expired = customer.discount_expiry && new Date(customer.discount_expiry) < new Date();
     const label = customer.discount_type === 'percent'
       ? `${customer.discount_value}% off`
-      : `₱${customer.discount_value} off`;
+      : `${formatCurrencyRaw(customer.discount_value)} off`;
     return { label, expired };
   };
 
@@ -57,7 +58,7 @@ export default function CustomerProfile({ customer, onClose, onRefresh }) {
           <div className="rounded-xl bg-bg-primary border border-border p-4 text-center">
             <Wallet size={20} className="text-accent-primary mx-auto mb-2" />
             <p className="font-heading text-h2 text-accent-primary tabular-nums">
-              ₱{Number(customer.ewallet || 0).toFixed(2)}
+              {formatCurrencyRaw(customer.ewallet || 0)}
             </p>
             <p className="text-tiny text-text-muted uppercase tracking-wider mt-1">eWallet</p>
           </div>
@@ -128,7 +129,7 @@ export default function CustomerProfile({ customer, onClose, onRefresh }) {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-heading text-body text-accent-primary tabular-nums">₱{Number(order.total).toFixed(2)}</p>
+                    <p className="font-heading text-body text-accent-primary tabular-nums">{formatCurrencyRaw(order.total)}</p>
                     <p className={cn(
                       'text-tiny uppercase font-semibold',
                       order.status === 'completed' ? 'text-accent-primary' : order.status === 'refunded' ? 'text-accent-danger' : 'text-text-muted'

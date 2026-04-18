@@ -1,7 +1,9 @@
 import { Minus, Plus, X, ShoppingCart, Percent, Tag, Star, Pause, Play } from 'lucide-react';
 import { useCheckoutStore } from '../../store/checkoutStore';
 import CustomerSelect from './CustomerSelect';
+import CustomSelect from '../shared/CustomSelect';
 import { cn } from '../../lib/cn';
+import { formatCurrencyRaw } from '../../lib/formatCurrency';
 import { useState } from 'react';
 
 /**
@@ -130,14 +132,14 @@ export default function Cart({ onPay, onSplitPay }) {
             >
               {/* Item details */}
               <div className="flex-1 min-w-0">
-                <p className="text-body font-medium text-text-primary truncate">
+                <p className="text-body font-medium text-text-primary line-clamp-2">
                   {item.name}
                 </p>
                 <p className="text-small text-text-secondary tabular-nums">
-                  ₱{Number(item.price).toFixed(2)} each
+                  {formatCurrencyRaw(item.price)} each
                   {item.discount > 0 && (
                     <span className="ml-2 text-accent-primary">
-                      -₱{Number(item.discount).toFixed(2)}
+                      -{formatCurrencyRaw(item.discount)}
                     </span>
                   )}
                 </p>
@@ -164,7 +166,7 @@ export default function Cart({ onPay, onSplitPay }) {
 
               {/* Line total */}
               <p className="text-body font-semibold text-accent-primary tabular-nums shrink-0 w-20 text-right">
-                ₱{((item.price * item.quantity) - item.discount).toFixed(2)}
+                {formatCurrencyRaw((item.price * item.quantity) - item.discount)}
               </p>
 
               {/* Actions */}
@@ -237,14 +239,16 @@ export default function Cart({ onPay, onSplitPay }) {
             </button>
           ) : showOrderDiscount ? (
             <div className="flex items-center gap-2">
-              <select
+              <CustomSelect
                 value={discountType}
-                onChange={(e) => setDiscountType(e.target.value)}
-                className="h-8 px-2 rounded bg-bg-input border border-border text-small text-text-primary focus:outline-none"
-              >
-                <option value="percent">%</option>
-                <option value="fixed">₱</option>
-              </select>
+                onChange={setDiscountType}
+                options={[
+                  { value: 'percent', label: '%' },
+                  { value: 'fixed', label: '₱' },
+                ]}
+                size="sm"
+                className="w-16"
+              />
               <input
                 type="number"
                 min="0"
@@ -272,7 +276,7 @@ export default function Cart({ onPay, onSplitPay }) {
           ) : discount ? (
             <div className="flex items-center justify-between">
               <span className="text-small text-text-secondary">
-                📎 {discount.type === 'percent' ? `${discount.value}% off` : `₱${discount.value} off`}
+                📎 {discount.type === 'percent' ? `${discount.value}% off` : `${formatCurrencyRaw(discount.value)} off`}
               </span>
               <button
                 onClick={clearDiscount}
@@ -287,7 +291,7 @@ export default function Cart({ onPay, onSplitPay }) {
           <div className="flex items-center justify-between">
             <span className="text-body text-text-secondary">Subtotal</span>
             <span className="text-body font-semibold text-text-primary tabular-nums">
-              ₱{subtotal.toFixed(2)}
+              {formatCurrencyRaw(subtotal)}
             </span>
           </div>
 
@@ -296,7 +300,7 @@ export default function Cart({ onPay, onSplitPay }) {
             <div className="flex items-center justify-between">
               <span className="text-body text-text-secondary">Discount</span>
               <span className="text-body font-semibold text-accent-primary tabular-nums">
-                -₱{discountAmount.toFixed(2)}
+                -{formatCurrencyRaw(discountAmount)}
               </span>
             </div>
           )}
@@ -306,7 +310,7 @@ export default function Cart({ onPay, onSplitPay }) {
             <div className="flex items-center justify-between">
               <span className="text-body text-text-secondary">Tip</span>
               <span className="text-body font-semibold text-text-primary tabular-nums">
-                +₱{tip.toFixed(2)}
+                +{formatCurrencyRaw(tip)}
               </span>
             </div>
           )}
@@ -318,7 +322,7 @@ export default function Cart({ onPay, onSplitPay }) {
           <div className="flex items-center justify-between">
             <span className="font-heading text-h2 text-text-primary">Total</span>
             <span className="font-heading text-display text-accent-primary tabular-nums">
-              ₱{total.toFixed(2)}
+              {formatCurrencyRaw(total)}
             </span>
           </div>
 
@@ -346,7 +350,7 @@ export default function Cart({ onPay, onSplitPay }) {
               onClick={onPay}
               className="flex-1 h-14 rounded-xl bg-accent-primary text-text-inverse font-heading text-h3 font-bold shadow-glow hover:bg-accent-primary-hover hover:shadow-[0_0_30px_rgba(0,212,170,0.25)] active:scale-[0.98] transition-all duration-150"
             >
-              Pay ₱{total.toFixed(2)}
+              Pay {formatCurrencyRaw(total)}
             </button>
           </div>
         </div>
@@ -383,7 +387,7 @@ function PointsRedeem({ customer }) {
           Points redeemed
         </span>
         <span className="text-small font-semibold text-accent-primary tabular-nums">
-          -₱{redeemedDiscount.toFixed(2)}
+          -{formatCurrencyRaw(redeemedDiscount)}
         </span>
       </div>
     );

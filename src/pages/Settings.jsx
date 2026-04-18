@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, Store, DollarSign, Receipt, Bell } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Store, DollarSign, Receipt, Bell, ImagePlus, X, Info } from 'lucide-react';
+import CustomSelect from '../components/shared/CustomSelect';
 import { useToast } from '../components/shared/Toast';
 import { cn } from '../lib/cn';
+import { formatCurrencyRaw } from '../lib/formatCurrency';
 
 /**
  * Settings page — store info, app settings, and cash drawer management.
@@ -58,7 +60,7 @@ export default function Settings() {
     if (isNaN(amount) || amount < 0) return;
     const result = await window.electronAPI.openDrawer(amount);
     if (result.success) {
-      toast.success(`Drawer opened with ₱${amount.toFixed(2)}`);
+      toast.success(`Drawer opened with ${formatCurrencyRaw(amount)}`);
       setDrawerAmount('');
     } else {
       toast.error(result.error);
@@ -70,7 +72,7 @@ export default function Settings() {
     if (isNaN(amount) || amount <= 0) return;
     const result = await window.electronAPI.addCashFlow({ type: cashType, amount, note: cashNote });
     if (result.success) {
-      toast.success(`${cashType === 'cash_in' ? 'Cash In' : 'Cash Out'}: ₱${amount.toFixed(2)}`);
+      toast.success(`${cashType === 'cash_in' ? 'Cash In' : 'Cash Out'}: ${formatCurrencyRaw(amount)}`);
       setDrawerAmount('');
       setCashNote('');
     } else {
@@ -110,7 +112,7 @@ export default function Settings() {
         <p className="text-small text-text-secondary mt-1">Store configuration and cash management</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Store Info */}
         <div className="rounded-xl border border-border bg-bg-secondary p-5">
           <div className="flex items-center gap-2 mb-4">
@@ -134,6 +136,38 @@ export default function Settings() {
                 className="w-full px-3 py-2 rounded-lg bg-bg-input border border-border text-body text-text-primary placeholder:text-text-muted focus:border-border-focus focus:outline-none resize-none"
               />
             </div>
+
+          {/* Store Logo */}
+          <div>
+            <label className="text-small text-text-secondary mb-1.5 block">Store Logo</label>
+            <div className="flex items-center gap-3">
+              {store.logo_path ? (
+                <div className="relative w-16 h-16 rounded-lg bg-bg-tertiary overflow-hidden border border-border">
+                  <img src={store.logo_path} alt="Store logo" className="w-full h-full object-contain" />
+                  <button
+                    onClick={() => setStore((s) => ({ ...s, logo_path: '' }))}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-danger text-white flex items-center justify-center hover:bg-accent-danger-hover"
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={async () => {
+                    const result = await window.electronAPI.uploadImage?.();
+                    if (result?.success && result.data?.path) {
+                      setStore((s) => ({ ...s, logo_path: result.data.path }));
+                    }
+                  }}
+                  className="w-16 h-16 rounded-lg border-2 border-dashed border-border hover:border-accent-primary flex items-center justify-center text-text-muted hover:text-accent-primary transition-colors"
+                >
+                  <ImagePlus size={20} />
+                </button>
+              )}
+              <p className="text-tiny text-text-muted">Shown on receipts &amp; login screen</p>
+            </div>
+          </div>
+
             <button
               onClick={handleSaveStore}
               disabled={saving}
@@ -201,9 +235,17 @@ export default function Settings() {
 
       {/* Cash Drawer Management */}
       <div className="rounded-xl border border-border bg-bg-secondary p-5 shrink-0">
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-2">
           <DollarSign size={18} className="text-accent-warning" />
           <h2 className="text-body font-semibold text-text-primary">Cash Drawer</h2>
+        </div>
+        <div className="flex items-start gap-2 mb-4 px-3 py-2 rounded-lg bg-accent-info/5 border border-accent-info/20">
+          <Info size={14} className="text-accent-info shrink-0 mt-0.5" />
+          <p className="text-tiny text-text-secondary leading-relaxed">
+            Track physical cash in the register. <strong>Open</strong> at shift start with your float amount. 
+            Use <strong>Cash In / Cash Out</strong> for mid-shift adjustments (petty cash, change runs). 
+            <strong>Close</strong> at shift end — the Reports page shows expected vs actual cash.
+          </p>
         </div>
         <div className="grid grid-cols-4 gap-3">
           <div className="col-span-2 space-y-2">
@@ -269,13 +311,13 @@ function SettingRow({ label, description, value, onChange, type = 'text', option
         <p className="text-tiny text-text-muted">{description}</p>
       </div>
       {type === 'select' ? (
-        <select
+        <CustomSelect
           value={localValue}
-          onChange={(e) => { setLocalValue(e.target.value); onChange(e.target.value); }}
-          className="h-9 px-2 rounded-lg bg-bg-input border border-border text-small text-text-primary focus:border-border-focus focus:outline-none shrink-0"
-        >
-          {options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+          onChange={(v) => { setLocalValue(v); onChange(v); }}
+          options={options || []}
+          size="sm"
+          className="w-40 shrink-0"
+        />
       ) : (
         <input
           type={type}

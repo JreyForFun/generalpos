@@ -16,6 +16,7 @@ function registerAllIpcHandlers(db) {
   require('./orders.ipc')(db);
   require('./customers.ipc')(db);
   require('./inventory.ipc')(db);
+  require('./ingredients.ipc')(db);
   require('./reports.ipc')(db);
   require('./settings.ipc')(db);
   require('./audit.ipc')(db);
