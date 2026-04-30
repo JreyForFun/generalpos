@@ -1,4 +1,4 @@
-# PREPPING SKILLS DONE
+# DEVELOPING 
 
 
  - PHASE 5 - Post - internet bad
